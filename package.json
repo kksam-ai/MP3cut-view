@@ -5,10 +5,14 @@
   "main": "src/main/index.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --debug"
+    "dev": "electron . --debug",
+    "watch": "nodemon --watch src/main --exec electron ."
   },
   "dependencies": {
-    "electron": "^25.0.0",
-    "@electron/remote": "^2.0.10"
+    "@electron/remote": "^2.0.10",
+    "electron": "^25.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
   }
 }
