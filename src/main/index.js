@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('path')
 const fs = require('fs')
+const audioProcessor = require('./audio-processor')
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -13,6 +14,7 @@ function createWindow() {
   })
 
   win.loadFile(path.join(__dirname, '../renderer/index.html'))
+  win.webContents.openDevTools()
 }
 
 // 处理音频文件
@@ -26,8 +28,11 @@ async function handleAudioFile(filePath) {
     // 读取文件信息
     const stats = fs.statSync(filePath)
 
+    // 转换音频文件
+    const wavPath = await audioProcessor.convertToWav(filePath)
+
     return {
-      path: filePath,
+      path: wavPath,  // 返回转换后的 WAV 文件路径
       size: stats.size,
       success: true
     }
