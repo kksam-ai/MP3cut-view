@@ -1,0 +1,14 @@
+{
+  "name": "audio-cutter",
+  "version": "1.0.0",
+  "description": "Audio cutting tool with waveform visualization",
+  "main": "src/main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --debug"
+  },
+  "dependencies": {
+    "electron": "^25.0.0",
+    "@electron/remote": "^2.0.10"
+  }
+}

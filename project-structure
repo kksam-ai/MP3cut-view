@@ -1,0 +1,12 @@
+audio-cutter/
+  ├── src/
+  │   ├── main/                 # 主进程代码
+  │   │   └── index.js         # 主进程入口
+  │   ├── renderer/            # 渲染进程代码
+  │   │   ├── index.html      # 主窗口
+  │   │   ├── index.js        # 渲染进程入口
+  │   │   ├── components/     # UI组件
+  │   │   └── utils/          # 工具函数
+  │   └── common/             # 共享代码
+  ├── package.json
+  └── .gitignore
