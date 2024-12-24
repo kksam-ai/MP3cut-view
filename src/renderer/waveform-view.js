@@ -8,19 +8,29 @@ class WaveformView {
   }
 
   resize() {
+    if (this.canvas.offsetWidth === 0) return; // 如果canvas不可见，不进行resize
+
     // 设置 canvas 大小以匹配显示大小
     this.canvas.width = this.canvas.offsetWidth * window.devicePixelRatio;
     this.canvas.height = this.canvas.offsetHeight * window.devicePixelRatio;
-    this.render();
+
+    // 如果有波形数据，重新渲染
+    if (this.waveformData) {
+      this.render();
+    }
   }
 
   setWaveform(data) {
     this.waveformData = data;
-    this.render();
+    // 确保canvas可见后再渲染
+    if (this.canvas.offsetWidth > 0) {
+      this.resize();
+      this.render();
+    }
   }
 
   render() {
-    if (!this.waveformData) return;
+    if (!this.waveformData || this.canvas.width === 0) return;
 
     const { width, height } = this.canvas;
     const ctx = this.context;
