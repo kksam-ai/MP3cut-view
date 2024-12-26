@@ -76,17 +76,6 @@ async function handleFile(file) {
     const wavData = await fs.promises.readFile(result.path);
     const audioData = await processAudioData(wavData.buffer);
 
-    // 显示文件信息
-    const size = (result.size / (1024 * 1024)).toFixed(2);
-    const duration = audioData.duration.toFixed(2);
-    audioInfo.style.display = 'block';
-    audioInfo.innerHTML = `
-      文件名: ${file.name}<br>
-      大小: ${size}MB<br>
-      时长: ${duration}秒<br>
-      采样率: ${audioData.sampleRate}Hz
-    `;
-
     // 切换界面状态
     emptyState.style.display = 'none';
     loadedState.style.display = 'block';
