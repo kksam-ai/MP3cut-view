@@ -19,19 +19,16 @@ const SUPPORTED_FORMATS = ['.m4a', '.mp3', '.mp4'];
 // 处理音频数据
 async function processAudioData(arrayBuffer) {
   const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+  const waveformData = computeWaveform(audioBuffer);
 
-  try {
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    const waveformData = computeWaveform(audioBuffer);
-
-    return {
-      duration: audioBuffer.duration,
-      sampleRate: audioBuffer.sampleRate,
-      waveform: waveformData
-    };
-  } finally {
-    audioContext.close();
-  }
+  return {
+    sampleRate: audioBuffer.sampleRate,
+    duration: audioBuffer.duration,
+    numberOfChannels: audioBuffer.numberOfChannels,
+    waveform: waveformData.data,
+    // 其他音频信息...
+  };
 }
 
 // 计算波形数据
@@ -52,7 +49,11 @@ function computeWaveform(audioBuffer) {
     waveform[i] = sum / blockSize;
   }
 
-  return waveform;
+  // 返回波形数据和音频时长
+  return {
+    data: waveform,
+    duration: audioBuffer.duration
+  };
 }
 
 // 处理文件
@@ -88,9 +89,9 @@ async function handleFile(file) {
     // 更新音频信息
     updateAudioInfo(file, audioData);
 
-    // 重要：等待下一帧再设置波形，确保canvas已经显示
+    // 设置波形，传入波形数据和音频时长
     requestAnimationFrame(() => {
-      waveformView.setWaveform(audioData.waveform);
+      waveformView.setWaveform(audioData.waveform, audioData.duration);
     });
 
     // 删除临时文件
