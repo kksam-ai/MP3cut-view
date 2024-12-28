@@ -34,22 +34,47 @@ async function processAudioData(arrayBuffer) {
 // 计算波形数据
 function computeWaveform(audioBuffer) {
   const channelData = audioBuffer.getChannelData(0);
-  const samples = 1000;
+
+  // 计算需要的采样点数
+  const PIXELS_PER_SECOND = 45;  // 与 WaveformView 保持一致
+  const BAR_WIDTH = 2;
+  const BAR_GAP = 1;
+  const samplesNeeded = Math.ceil(
+    audioBuffer.duration * (PIXELS_PER_SECOND / (BAR_WIDTH + BAR_GAP))
+  );
+
+  // 确保至少有1000个采样点
+  const samples = Math.max(1000, samplesNeeded);
+
+  // 计算每个块的大小
   const blockSize = Math.floor(channelData.length / samples);
   const waveform = new Float32Array(samples);
 
+  // 使用峰值检测而不是平均值
   for (let i = 0; i < samples; i++) {
     const start = i * blockSize;
-    let sum = 0;
+    const end = Math.min(start + blockSize, channelData.length);
 
-    for (let j = 0; j < blockSize; j++) {
-      sum += Math.abs(channelData[start + j]);
+    // 在每个块中找出最大绝对值
+    let maxAmp = 0;
+    for (let j = start; j < end; j++) {
+      const abs = Math.abs(channelData[j]);
+      if (abs > maxAmp) {
+        maxAmp = abs;
+      }
     }
 
-    waveform[i] = sum / blockSize;
+    waveform[i] = maxAmp;
   }
 
-  // 返回波形数据和音频时长
+  console.log('Computed waveform:', {
+    duration: audioBuffer.duration,
+    originalLength: channelData.length,
+    samplesNeeded,
+    actualSamples: samples,
+    blockSize
+  });
+
   return {
     data: waveform,
     duration: audioBuffer.duration

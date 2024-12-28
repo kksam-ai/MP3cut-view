@@ -30,62 +30,120 @@ class WaveformView {
     });
   }
 
-  // 重采样波形数据，确保数据点均匀分布
-  resampleWaveform(data, targetLength) {
-    const result = new Float32Array(targetLength);
-    const step = data.length / targetLength;
+  // 添加峰值检测函数
+  detectPeaks(data, windowSize) {
+    const peaks = [];
 
-    for (let i = 0; i < targetLength; i++) {
-      const position = i * step;
-      const index = Math.floor(position);
-      const decimal = position - index;
+    for (let i = 0; i < data.length; i += windowSize) {
+      const window = data.slice(i, Math.min(i + windowSize, data.length));
+      if (window.length === 0) break;
 
-      // 使用线性插值获取采样点
-      const currentValue = data[index] || 0;
-      const nextValue = data[index + 1] || currentValue;
-      result[i] = currentValue + (nextValue - currentValue) * decimal;
+      // 找出窗口内的最大值和最小值
+      const max = Math.max(...window);
+      const min = Math.min(...window);
+
+      // 使用较大的绝对值来表示波形高度
+      const peak = Math.abs(max) > Math.abs(min) ? max : min;
+      peaks.push(peak);
     }
 
-    return result;
+    return new Float32Array(peaks);
   }
 
-  // 归一化波形数据到0-1范围
-  normalizeWaveform(data) {
-    const max = Math.max(...data);
-    return data.map(value => value / max);
+  // 修改重采样函数
+  resampleWaveform(waveform, targetLength) {
+    const originalLength = waveform.length;
+
+    // 如果目标长度大于原始长度,直接返回原始数据
+    if (targetLength >= originalLength) {
+      return new Float32Array(waveform);
+    }
+
+    // 计算每个窗口的大小
+    const windowSize = Math.ceil(originalLength / targetLength);
+
+    // 使用峰值检测进行重采样
+    return this.detectPeaks(waveform, windowSize);
   }
 
-  // 处理波形数据，基于默认缩放比例
+  // 修改波形处理函数
   processWaveform(data) {
-    // 获取当前容器宽度
-    const containerWidth = this.canvas.offsetWidth;
-    // 计算每行可以容纳的采样点数
-    const barsPerRow = Math.floor(containerWidth / (this.BAR_WIDTH + this.BAR_GAP));
-    // 计算总采样点数
-    const totalBars = Math.ceil(this.audioDuration * this.PIXELS_PER_SECOND / (this.BAR_WIDTH + this.BAR_GAP));
+    if (!data || data.length === 0) {
+      console.error('Invalid input data');
+      return new Float32Array(0);
+    }
 
-    // 重采样
-    const resampled = this.resampleWaveform(data, totalBars);
-    // 归一化
-    return this.normalizeWaveform(resampled);
+    try {
+      // 计算需要的总波形条数
+      // 1秒 = 1000ms / 66.67ms ≈ 15个波形条
+      const barsPerSecond = 1000 / 66.67;
+      const totalBars = Math.ceil(this.audioDuration * barsPerSecond);
+
+      // 计算每个波形条对应的原始数据点数
+      const samplesPerBar = Math.ceil(data.length / totalBars);
+
+      // 使用峰值检测处理原始数据
+      const processedData = this.detectPeaks(data, samplesPerBar);
+
+      // 归一化处理后的数据
+      const maxAmplitude = Math.max(...Array.from(processedData).map(Math.abs));
+      if (maxAmplitude === 0) {
+        console.warn('No amplitude detected in audio data');
+        return new Float32Array(processedData.length).fill(0);
+      }
+
+      const normalizedData = new Float32Array(processedData.length);
+      for (let i = 0; i < processedData.length; i++) {
+        normalizedData[i] = processedData[i] / maxAmplitude;
+      }
+
+      console.log('Waveform processing stats:', {
+        audioDuration: this.audioDuration,
+        barsPerSecond,
+        totalBars,
+        samplesPerBar,
+        processedLength: normalizedData.length
+      });
+
+      return normalizedData;
+    } catch (error) {
+      console.error('Error processing waveform:', error);
+      return new Float32Array(0);
+    }
   }
 
   // 设置波形数据和时长
   setWaveform(data, duration) {
+    if (!data || !duration) {
+      console.error('Invalid data or duration');
+      return;
+    }
+
     // 重置所有状态
-    this.waveformData = data;
+    this.waveformData = new Float32Array(data);
     this.audioDuration = duration;
 
     if (this.canvas.offsetWidth > 0) {
-      // 重新处理波形数据
-      this.processedData = this.processWaveform(data);
-      // 强制重新计算布局和尺寸
-      this.canvas.style.width = '';
-      this.canvas.style.height = '';
-      this.canvas.width = 0;
-      this.canvas.height = 0;
-      // 重新设置尺寸和渲染
-      this.resize();
+      try {
+        // 重新处理波形数据
+        this.processedData = this.processWaveform(this.waveformData);
+        console.log('Processed waveform data:', {
+          originalLength: data.length,
+          processedLength: this.processedData.length,
+          duration: this.audioDuration
+        });
+
+        // 强制重新计算布局和尺寸
+        this.canvas.style.width = '';
+        this.canvas.style.height = '';
+        this.canvas.width = 0;
+        this.canvas.height = 0;
+
+        // 重新设置尺寸和渲染
+        this.resize();
+      } catch (error) {
+        console.error('Error in setWaveform:', error);
+      }
     }
   }
 
@@ -95,15 +153,18 @@ class WaveformView {
     const containerWidth = this.canvas.offsetWidth;
     const containerHeight = this.canvas.offsetHeight;
 
-    // 计算每行可以显示的时长（秒）
-    const secondsPerRow = containerWidth / this.PIXELS_PER_SECOND;
+    // 计算每个波形条的总宽度(包含间距)
+    const barTotalWidth = this.BAR_WIDTH + this.BAR_GAP;
 
-    // 计算需要的总行数
-    const totalRows = Math.ceil(this.audioDuration / secondsPerRow);
+    // 计算每行能容纳的波形条数量
+    const barsPerRow = Math.floor(containerWidth / barTotalWidth);
 
-    // 计算每行波形数据的索引范围
-    const samplesPerSecond = this.processedData.length / this.audioDuration;
-    const samplesPerRow = Math.floor(secondsPerRow * samplesPerSecond);
+    // 计算总行数
+    const totalBars = this.processedData.length;
+    const totalRows = Math.ceil(totalBars / barsPerRow);
+
+    // 计算最后一行的波形条数量
+    const lastRowBars = totalBars % barsPerRow || barsPerRow;
 
     // 计算实际需要的高度（CSS像素）
     const rowHeightCSS = this.LINE_HEIGHT + this.LINE_GAP;
@@ -114,31 +175,33 @@ class WaveformView {
     const totalHeight = totalHeightCSS * this.dpr;
     const rowWidth = containerWidth * this.dpr;
 
-    // 计算最后一行
-    const lastRowSeconds = this.audioDuration % secondsPerRow || secondsPerRow;
-    const lastRowWidth = (lastRowSeconds * this.PIXELS_PER_SECOND) * this.dpr;
-    const lastRowSamples = Math.floor(lastRowSeconds * samplesPerSecond);
+    // 计算最后一行宽度
+    const lastRowWidth = (lastRowBars * barTotalWidth) * this.dpr;
+
+    // 如果需要重采样,使用新的峰值检测方法
+    if (totalBars > this.waveformData.length) {
+      this.waveformData = this.resampleWaveform(this.waveformData, totalBars);
+    }
 
     return {
       dpr: this.dpr,
       // 容器信息
       containerWidth,
       containerHeight,
+      // 波形条信息
+      barTotalWidth: barTotalWidth * this.dpr,
+      barsPerRow,
       // 行信息
       rowWidth,
       rowHeight,
-      secondsPerRow,
-      samplesPerRow,
       // 总体信息
       totalRows,
-      totalHeight: totalHeight,
+      totalBars,
+      totalHeight,
       totalHeightCSS,
       // 最后一行信息
       lastRowWidth,
-      lastRowSeconds,
-      lastRowSamples,
-      // 采样率信息
-      samplesPerSecond
+      lastRowBars
     };
   }
 
@@ -194,10 +257,12 @@ class WaveformView {
       const isLastRow = row === layout.totalRows - 1;
       const startY = row * layout.rowHeight;
 
-      // 计算当前行的数据范围和宽度
-      const startIndex = row * layout.samplesPerRow;
-      const samplesInThisRow = isLastRow ? layout.lastRowSamples : layout.samplesPerRow;
-      const rowData = this.processedData.slice(startIndex, startIndex + samplesInThisRow);
+      // 计算当前行的波形条数量和数据范围
+      const barsInThisRow = isLastRow ? layout.lastRowBars : layout.barsPerRow;
+      const startIndex = row * layout.barsPerRow;
+      const rowData = this.processedData.slice(startIndex, startIndex + barsInThisRow);
+
+      // 计算当前行的宽度
       const rowWidthInPixels = isLastRow ? layout.lastRowWidth : layout.rowWidth;
 
       // 绘制背景
@@ -209,22 +274,16 @@ class WaveformView {
         this.LINE_HEIGHT * this.dpr
       );
 
-      // 计算实际的波形条间距，确保填满背景宽度
-      const totalBars = rowData.length;
-      const availableWidth = rowWidthInPixels;
-      const barWidth = this.BAR_WIDTH * this.dpr;
-      const barGap = (availableWidth - totalBars * barWidth) / (totalBars - 1);
-
       // 绘制波形
       ctx.fillStyle = '#2196f3';
       for (let i = 0; i < rowData.length; i++) {
-        const x = i * (barWidth + barGap);
+        const x = i * layout.barTotalWidth;
         const amplitude = rowData[i] * (this.MAX_WAVE_HEIGHT * this.dpr);
 
         ctx.fillRect(
           x,
           startY + (this.LINE_HEIGHT * this.dpr) - amplitude,
-          barWidth,
+          this.BAR_WIDTH * this.dpr,
           amplitude
         );
       }
