@@ -12,6 +12,7 @@ const playBtn = document.getElementById('playBtn');
 const markBtn = document.getElementById('markBtn');
 const exportBtn = document.getElementById('exportBtn');
 const openFileBtn = document.getElementById('openFileBtn');
+const mainContent = document.querySelector('.main-content');
 
 // 支持的音频格式
 const SUPPORTED_FORMATS = ['.m4a', '.mp3', '.mp4'];
@@ -203,3 +204,59 @@ dropZone.addEventListener('drop', (e) => {
     handleFile(file);
   }
 });
+
+function handleDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const files = e.dataTransfer.files;
+  if (files.length > 0) {
+    handleFile(files[0]);
+  }
+
+  // 移除所有拖放相关的视觉效果
+  dropZone.classList.remove('dragover');
+  mainContent.classList.remove('dragover');
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  // 添加拖放视觉效果
+  if (emptyState.style.display !== 'none') {
+    dropZone.classList.add('dragover');
+  }
+  mainContent.classList.add('dragover');
+}
+
+function handleDragLeave(e) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  // 检查是否真的离开了元素
+  const rect = mainContent.getBoundingClientRect();
+  if (
+    e.clientX <= rect.left ||
+    e.clientX >= rect.right ||
+    e.clientY <= rect.top ||
+    e.clientY >= rect.bottom
+  ) {
+    dropZone.classList.remove('dragover');
+    mainContent.classList.remove('dragover');
+  }
+}
+
+// 为 main-content 添加拖放事件监听
+mainContent.addEventListener('drop', handleDrop);
+mainContent.addEventListener('dragover', handleDragOver);
+mainContent.addEventListener('dragleave', handleDragLeave);
+
+// 修改原有的拖放相关样式
+const dropZoneStyle = document.createElement('style');
+dropZoneStyle.textContent = `
+  .main-content.dragover {
+    background: rgba(33, 150, 243, 0.05);
+  }
+`;
+document.head.appendChild(dropZoneStyle);
