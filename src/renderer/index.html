@@ -221,6 +221,25 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+
+    /* 播放按钮状态 */
+    #playBtn.playing .play-icon {
+      display: none;
+    }
+    #playBtn.playing .pause-icon {
+      display: block !important;
+    }
+    #playBtn:not(.playing) .play-icon {
+      display: block;
+    }
+    #playBtn:not(.playing) .pause-icon {
+      display: none !important;
+    }
+
+    /* 确保 SVG 内的所有元素都继承颜色 */
+    #playBtn svg * {
+      fill: currentColor;
+    }
   </style>
 </head>
 <body>
@@ -237,9 +256,14 @@
 
     <button id="playBtn" disabled>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polygon points="5 3 19 12 5 21 5 3"/>
+        <g class="play-icon">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </g>
+        <g class="pause-icon" style="display: none;">
+          <path d="M5 3h4v18H5zM15 3h4v18h-4z" stroke="none"/>
+        </g>
       </svg>
-      播放
+      <span class="btn-text">播放</span>
     </button>
 
     <div class="separator"></div>

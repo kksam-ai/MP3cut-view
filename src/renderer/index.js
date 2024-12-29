@@ -1,5 +1,6 @@
 const { ipcRenderer } = require('electron')
 const WaveformView = require('./waveform-view')
+const AudioPlayer = require('./audio-player')
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 const audioInfo = document.getElementById('audioInfo');
@@ -17,6 +18,9 @@ const loadingMask = document.getElementById('loadingMask');
 
 // 支持的音频格式
 const SUPPORTED_FORMATS = ['.m4a', '.mp3', '.mp4'];
+
+// 创建音频播放器实例
+const audioPlayer = new AudioPlayer();
 
 // 显示加载遮罩
 function showLoading() {
@@ -36,29 +40,28 @@ function hideLoading() {
 
 // 处理音频数据
 async function processAudioData(arrayBuffer) {
-  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-  const waveformData = computeWaveform(audioBuffer);
+  // 加载音频并获取音频信息
+  const audioInfo = await audioPlayer.loadAudio(arrayBuffer);
+
+  // 使用音频缓冲区数据计算波形
+  const waveformData = computeWaveform(audioPlayer.getWaveformData(), audioInfo.duration);
 
   return {
-    sampleRate: audioBuffer.sampleRate,
-    duration: audioBuffer.duration,
-    numberOfChannels: audioBuffer.numberOfChannels,
+    sampleRate: audioInfo.sampleRate,
+    duration: audioInfo.duration,
+    numberOfChannels: audioInfo.numberOfChannels,
     waveform: waveformData.data,
-    // 其他音频信息...
   };
 }
 
 // 计算波形数据
-function computeWaveform(audioBuffer) {
-  const channelData = audioBuffer.getChannelData(0);
-
+function computeWaveform(channelData, duration) {
   // 计算需要的采样点数
-  const PIXELS_PER_SECOND = 45;  // 与 WaveformView 保持一致
+  const PIXELS_PER_SECOND = 45;
   const BAR_WIDTH = 2;
   const BAR_GAP = 1;
   const samplesNeeded = Math.ceil(
-    audioBuffer.duration * (PIXELS_PER_SECOND / (BAR_WIDTH + BAR_GAP))
+    duration * (PIXELS_PER_SECOND / (BAR_WIDTH + BAR_GAP))
   );
 
   // 确保至少有1000个采样点
@@ -68,7 +71,7 @@ function computeWaveform(audioBuffer) {
   const blockSize = Math.floor(channelData.length / samples);
   const waveform = new Float32Array(samples);
 
-  // 使用峰值检测而不是平均值
+  // 使用峰值检测
   for (let i = 0; i < samples; i++) {
     const start = i * blockSize;
     const end = Math.min(start + blockSize, channelData.length);
@@ -86,7 +89,7 @@ function computeWaveform(audioBuffer) {
   }
 
   console.log('Computed waveform:', {
-    duration: audioBuffer.duration,
+    duration: duration,
     originalLength: channelData.length,
     samplesNeeded,
     actualSamples: samples,
@@ -95,7 +98,7 @@ function computeWaveform(audioBuffer) {
 
   return {
     data: waveform,
-    duration: audioBuffer.duration
+    duration: duration
   };
 }
 
@@ -283,3 +286,67 @@ dropZoneStyle.textContent = `
   }
 `;
 document.head.appendChild(dropZoneStyle);
+
+// 播放控制
+function togglePlay() {
+  if (audioPlayer.isAudioPlaying()) {
+    audioPlayer.pause();
+    playBtn.classList.remove('playing');
+    playBtn.querySelector('.btn-text').textContent = '播放';
+    waveformView.stopPlayback();
+  } else {
+    audioPlayer.play();
+    playBtn.classList.add('playing');
+    playBtn.querySelector('.btn-text').textContent = '暂停';
+    waveformView.startPlayback();
+  }
+}
+
+// 绑定播放按钮事件
+playBtn.addEventListener('click', togglePlay);
+
+// 绑定空格键控制
+document.addEventListener('keydown', (e) => {
+  // 如果正在编辑输入框，不处理空格键
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+    return;
+  }
+
+  if (e.code === 'Space' && !playBtn.disabled) {
+    e.preventDefault(); // 防止页面滚动
+    togglePlay();
+  }
+});
+
+// 监听播放结束
+audioPlayer.onEnded = () => {
+  playBtn.classList.remove('playing');
+  playBtn.querySelector('.btn-text').textContent = '播放';
+};
+
+// 更新播放位置
+function updatePlaybackPosition() {
+  if (audioPlayer.isAudioPlaying()) {
+    waveformView.setPlaybackPosition(audioPlayer.getCurrentTime());
+    requestAnimationFrame(updatePlaybackPosition);
+  }
+}
+
+// 监听播放状态变化
+audioPlayer.onPlay = () => {
+  updatePlaybackPosition();
+};
+
+// 处理时间选择
+waveformView.onTimeSelect = (time) => {
+  // 设置音频播放位置
+  audioPlayer.seek(time);
+
+  // 更新播放条位置
+  waveformView.setPlaybackPosition(time);
+
+  // 如果当前正在播放，继续播放
+  if (audioPlayer.isAudioPlaying()) {
+    audioPlayer.play();
+  }
+};

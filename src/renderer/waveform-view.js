@@ -34,6 +34,17 @@ class WaveformView {
       this.dpr = window.devicePixelRatio;
       this.resize();
     });
+
+    // 播放条相关
+    this.playbackPosition = 0;  // 当前播放位置(秒)
+    this._animationFrame = null;
+
+    // 点击回调
+    this.onTimeSelect = null;
+
+    // 绑定事件处理
+    this._handleClick = this._handleClick.bind(this);
+    this.canvas.addEventListener('click', this._handleClick);
   }
 
   // 添加峰值检测函数
@@ -128,6 +139,8 @@ class WaveformView {
     // 重置所有状态
     this.waveformData = new Float32Array(data);
     this.audioDuration = duration;
+    this.playbackPosition = 0;  // 重置播放条位置
+    this.stopPlayback();  // 停止之前的播放动画
 
     if (this.canvas.offsetWidth > 0) {
       try {
@@ -332,6 +345,96 @@ class WaveformView {
         );
       }
     }
+
+    // 渲染播放条
+    const playbackPos = this._calculatePlaybackPosition();
+    if (playbackPos && playbackPos.isVisible) {
+      const x = playbackPos.offset;
+      const y = playbackPos.row * layout.rowHeight;
+
+      ctx.fillStyle = '#ff9800';  // 橙色
+      ctx.fillRect(
+        x,
+        y,
+        2 * this.dpr,  // 2px宽度
+        this.LINE_HEIGHT * this.dpr  // 90px高度
+      );
+    }
+  }
+
+  // 设置播放位置
+  setPlaybackPosition(time) {
+    this.playbackPosition = time;
+    this.render();  // 重新渲染以更新播放条位置
+  }
+
+  // 开始播放动画
+  startPlayback() {
+    if (this._animationFrame) return;
+
+    const animate = () => {
+      this.render();
+      this._animationFrame = requestAnimationFrame(animate);
+    };
+
+    animate();
+  }
+
+  // 停止播放动画
+  stopPlayback() {
+    if (this._animationFrame) {
+      cancelAnimationFrame(this._animationFrame);
+      this._animationFrame = null;
+    }
+  }
+
+  // 计算播放条位置
+  _calculatePlaybackPosition() {
+    if (!this.processedData) return null;
+
+    const layout = this.calculateLayout();
+    const pixelsPerSecond = this.PIXELS_PER_SECOND * this.dpr;
+    const totalPixels = this.playbackPosition * pixelsPerSecond;
+
+    // 计算行号和行内偏移
+    const row = Math.floor(totalPixels / layout.rowWidth);
+    const offset = totalPixels % layout.rowWidth;
+
+    return {
+      row,
+      offset,
+      isVisible: row < layout.totalRows
+    };
+  }
+
+  // 处理点击事件
+  _handleClick(e) {
+    if (!this.processedData || !this.onTimeSelect) return;
+
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // 计算点击位置对应的时间
+    const layout = this.calculateLayout();
+    const rowIndex = Math.floor(y / (this.LINE_HEIGHT + this.LINE_GAP));
+    const rowOffset = x * this.dpr;
+
+    // 计算总像素偏移
+    const totalPixels = (rowIndex * layout.rowWidth + rowOffset) / this.dpr;
+
+    // 转换为时间
+    const time = totalPixels / this.PIXELS_PER_SECOND;
+
+    // 确保时间在有效范围内
+    if (time >= 0 && time <= this.audioDuration) {
+      this.onTimeSelect(time);
+    }
+  }
+
+  // 清理资源
+  destroy() {
+    this.canvas.removeEventListener('click', this._handleClick);
   }
 }
 
