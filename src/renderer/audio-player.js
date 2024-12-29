@@ -92,6 +92,10 @@ class AudioPlayer {
   // 播放控制
   play() {
     if (!this.isPlaying) {
+      // 如果已经播放到末尾，则从头开始播放
+      if (this.audio.currentTime >= this.audio.duration) {
+        this.audio.currentTime = 0;
+      }
       this.audioContext.resume();
       this.audio.play();
       this.isPlaying = true;
@@ -131,7 +135,6 @@ class AudioPlayer {
   // 处理播放结束
   _handleEnded() {
     this.isPlaying = false;
-    this.audio.currentTime = 0;
     if (this.onEnded) {
       this.onEnded();
     }

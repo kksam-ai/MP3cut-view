@@ -137,42 +137,50 @@ async function handleFile(file) {
     const result = await ipcRenderer.invoke('process-audio-file', file.path);
 
     if (!result.success) {
-      throw new Error(result.error);
+      throw new Error(result.error || '处理文件失败');
     }
 
     // 读取转换后的 WAV 文件
     const wavData = await fs.promises.readFile(result.path);
-    const audioData = await processAudioData(wavData.buffer);
 
-    // 切换界面状态
-    emptyState.style.display = 'none';
-    loadedState.style.display = 'block';
+    try {
+      const audioData = await processAudioData(wavData.buffer);
 
-    // 启用按钮
-    playBtn.disabled = false;
-    markBtn.disabled = false;
-    exportBtn.disabled = false;
+      // 切换界面状态
+      emptyState.style.display = 'none';
+      loadedState.style.display = 'block';
 
-    // 更新音频信息
-    updateAudioInfo(file, audioData);
+      // 启用按钮
+      playBtn.disabled = false;
+      markBtn.disabled = false;
+      exportBtn.disabled = false;
 
-    // 设置波形，传入波形数据和音频时长
-    requestAnimationFrame(() => {
-      waveformView.setWaveform(audioData.waveform, audioData.duration);
-      // 波形渲染完成后隐藏加载遮罩
-      hideLoading();
-    });
+      // 更新音频信息
+      updateAudioInfo(file, audioData);
 
-    // 删除临时文件
-    await fs.promises.unlink(result.path);
+      // 设置波形，传入波形数据和音频时长
+      requestAnimationFrame(() => {
+        waveformView.setWaveform(audioData.waveform, audioData.duration);
+        // 波形渲染完成后隐藏加载遮罩
+        hideLoading();
+      });
+    } finally {
+      // 确保临时文件被删除
+      try {
+        await fs.promises.unlink(result.path);
+      } catch (unlinkError) {
+        console.error('Error deleting temp file:', unlinkError);
+      }
+    }
 
   } catch (error) {
+    console.error('Error processing file:', error);
     hideLoading();
     // 错误处理时重置状态
     playBtn.disabled = true;
     markBtn.disabled = true;
     exportBtn.disabled = true;
-    alert('处理文件时出错: ' + error.message);
+    alert('处理文件时出错: ' + (error.message || '未知错误'));
   }
 }
 
@@ -353,7 +361,6 @@ audioPlayer.onEnded = () => {
   playBtn.classList.remove('playing');
   playBtn.querySelector('.btn-text').textContent = '播放';
   waveformView.stopPlayback();
-  waveformView.setPlaybackPosition(0);
 };
 
 // 更新播放位置
