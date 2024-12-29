@@ -106,6 +106,13 @@ function computeWaveform(channelData, duration) {
 async function handleFile(file) {
   showLoading();
 
+  // 重置播放状态
+  if (audioPlayer.isAudioPlaying()) {
+    audioPlayer.pause();
+    playBtn.classList.remove('playing');
+    playBtn.querySelector('.btn-text').textContent = '播放';
+  }
+
   // 检查文件格式
   const extension = file.name.toLowerCase().match(/\.[^.]*$/)?.[0];
   if (!extension || !SUPPORTED_FORMATS.includes(extension)) {
@@ -150,6 +157,10 @@ async function handleFile(file) {
 
   } catch (error) {
     hideLoading();
+    // 错误处理时重置状态
+    playBtn.disabled = true;
+    markBtn.disabled = true;
+    exportBtn.disabled = true;
     alert('处理文件时出错: ' + error.message);
   }
 }
@@ -322,6 +333,8 @@ document.addEventListener('keydown', (e) => {
 audioPlayer.onEnded = () => {
   playBtn.classList.remove('playing');
   playBtn.querySelector('.btn-text').textContent = '播放';
+  waveformView.stopPlayback();
+  waveformView.setPlaybackPosition(0);
 };
 
 // 更新播放位置

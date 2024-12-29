@@ -372,8 +372,14 @@ class WaveformView {
   startPlayback() {
     if (this._animationFrame) return;
 
+    let lastTime = performance.now();
     const animate = () => {
-      this.render();
+      const currentTime = performance.now();
+      // 限制刷新率，避免过度渲染
+      if (currentTime - lastTime > 16) {  // 约60fps
+        this.render();
+        lastTime = currentTime;
+      }
       this._animationFrame = requestAnimationFrame(animate);
     };
 
@@ -434,7 +440,17 @@ class WaveformView {
 
   // 清理资源
   destroy() {
+    // 停止播放动画
+    this.stopPlayback();
+
+    // 移除事件监听
     this.canvas.removeEventListener('click', this._handleClick);
+
+    // 清除动画帧
+    if (this._animationFrame) {
+      cancelAnimationFrame(this._animationFrame);
+      this._animationFrame = null;
+    }
   }
 }
 

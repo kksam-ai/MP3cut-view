@@ -131,6 +131,7 @@ class AudioPlayer {
   // 处理播放结束
   _handleEnded() {
     this.isPlaying = false;
+    this.audio.currentTime = 0;
     if (this.onEnded) {
       this.onEnded();
     }
