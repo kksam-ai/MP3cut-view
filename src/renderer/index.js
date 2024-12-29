@@ -43,12 +43,15 @@ async function processAudioData(arrayBuffer) {
   // 加载音频并获取音频信息
   const audioInfo = await audioPlayer.loadAudio(arrayBuffer);
 
+  // 使用 AudioBuffer 的准确时长
+  const duration = audioInfo.audioBuffer.duration;
+
   // 使用音频缓冲区数据计算波形
-  const waveformData = computeWaveform(audioPlayer.getWaveformData(), audioInfo.duration);
+  const waveformData = computeWaveform(audioPlayer.getWaveformData(), duration);
 
   return {
     sampleRate: audioInfo.sampleRate,
-    duration: audioInfo.duration,
+    duration: duration,
     numberOfChannels: audioInfo.numberOfChannels,
     waveform: waveformData.data,
   };
@@ -64,17 +67,20 @@ function computeWaveform(channelData, duration) {
     duration * (PIXELS_PER_SECOND / (BAR_WIDTH + BAR_GAP))
   );
 
-  // 确保至少有1000个采样点
-  const samples = Math.max(1000, samplesNeeded);
+  // 使用实际需要的采样点数
+  const samples = samplesNeeded;
 
   // 计算每个块的大小
-  const blockSize = Math.floor(channelData.length / samples);
+  const blockSize = Math.ceil(channelData.length / samples);
   const waveform = new Float32Array(samples);
 
   // 使用峰值检测
   for (let i = 0; i < samples; i++) {
     const start = i * blockSize;
     const end = Math.min(start + blockSize, channelData.length);
+
+    // 确保至少有一个采样点
+    if (start >= channelData.length) break;
 
     // 在每个块中找出最大绝对值
     let maxAmp = 0;
@@ -193,9 +199,17 @@ function updateAudioInfo(file, audioData) {
 
 // 格式化时间显示
 function formatDuration(seconds) {
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.floor(seconds % 60);
-  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 100);
+
+  return [
+    hours > 0 ? hours.toString().padStart(2, '0') : null,
+    minutes.toString().padStart(2, '0'),
+    secs.toString().padStart(2, '0'),
+    ms.toString().padStart(2, '0')
+  ].filter(Boolean).join(':');
 }
 
 // 格式化文件大小显示
