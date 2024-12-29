@@ -116,6 +116,7 @@ function computeWaveform(channelData, duration) {
 // 处理文件
 async function handleFile(file) {
   showLoading();
+  let tempFilePath = null;
 
   // 重置播放状态
   if (audioPlayer.isAudioPlaying()) {
@@ -135,52 +136,64 @@ async function handleFile(file) {
   try {
     // 发送文件到主进程处理
     const result = await ipcRenderer.invoke('process-audio-file', file.path);
-
     if (!result.success) {
       throw new Error(result.error || '处理文件失败');
     }
 
+    tempFilePath = result.path;
+
     // 读取转换后的 WAV 文件
-    const wavData = await fs.promises.readFile(result.path);
+    const wavData = await fs.promises.readFile(tempFilePath);
 
-    try {
-      const audioData = await processAudioData(wavData.buffer);
+    // 处理音频数据
+    const audioData = await processAudioData(wavData.buffer);
 
-      // 切换界面状态
-      emptyState.style.display = 'none';
-      loadedState.style.display = 'block';
+    // 切换界面状态
+    emptyState.style.display = 'none';
+    loadedState.style.display = 'block';
 
-      // 启用按钮
-      playBtn.disabled = false;
-      markBtn.disabled = false;
-      exportBtn.disabled = false;
+    // 启用按钮
+    playBtn.disabled = false;
+    markBtn.disabled = false;
+    exportBtn.disabled = false;
 
-      // 更新音频信息
-      updateAudioInfo(file, audioData);
+    // 更新音频信息
+    updateAudioInfo(file, audioData);
 
-      // 设置波形，传入波形数据和音频时长
-      requestAnimationFrame(() => {
-        waveformView.setWaveform(audioData.waveform, audioData.duration);
-        // 波形渲染完成后隐藏加载遮罩
-        hideLoading();
-      });
-    } finally {
-      // 确保临时文件被删除
-      try {
-        await fs.promises.unlink(result.path);
-      } catch (unlinkError) {
-        console.error('Error deleting temp file:', unlinkError);
-      }
-    }
+    // 设置波形
+    requestAnimationFrame(() => {
+      waveformView.setWaveform(audioData.waveform, audioData.duration);
+      hideLoading();
+    });
 
   } catch (error) {
     console.error('Error processing file:', error);
     hideLoading();
+
     // 错误处理时重置状态
     playBtn.disabled = true;
     markBtn.disabled = true;
     exportBtn.disabled = true;
+
+    // 显示具体错误信息
     alert('处理文件时出错: ' + (error.message || '未知错误'));
+
+  } finally {
+    // 确保所有处理完成后再删除临时文件
+    if (tempFilePath) {
+      try {
+        // 添加小延迟确保文件不在使用中
+        setTimeout(async () => {
+          try {
+            await fs.promises.unlink(tempFilePath);
+          } catch (unlinkError) {
+            console.error('Error deleting temp file:', unlinkError);
+          }
+        }, 1000);
+      } catch (unlinkError) {
+        console.error('Error deleting temp file:', unlinkError);
+      }
+    }
   }
 }
 

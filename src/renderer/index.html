@@ -24,8 +24,8 @@
     .toolbar {
       height: 60px;
       padding: 0 20px;
-      background: #fff;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      background: #E4E3E4;
+      box-shadow: inset 0 -1px 0 rgba(0,0,0,0.1);
       display: flex;
       align-items: center;
       gap: 20px;
@@ -68,7 +68,55 @@
       background: #fff;
       overflow: hidden;
       display: flex;
+      flex-direction: row;
+    }
+
+    /* 左侧内容区 */
+    .content-area {
+      flex: 1;
+      position: relative;
+      display: flex;
       flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* 右侧控制面板 */
+    .control-panel {
+      width: 300px;
+      border-left: 1px solid #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      background: #f7f6f8;
+    }
+
+    /* 标记列表区域 */
+    .mark-list {
+      flex: 1;
+      overflow-y: auto;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 16px;
+    }
+
+    /* 控制按钮区域 */
+    .control-buttons {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* 调整滚动条样式 */
+    .mark-list::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .mark-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .mark-list::-webkit-scrollbar-thumb {
+      background-color: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
     }
 
     /* 空状态 */
@@ -285,28 +333,53 @@
 
   <!-- 主要内容区 -->
   <div class="main-content">
-    <!-- 空状态 -->
-    <div id="emptyState">
-      <div id="dropZone">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="1">
-          <path d="M19 13v6H5v-6H3v6c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6h-2z"/>
-          <path d="M13 12.67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2v9.67z"/>
-        </svg>
-        <p class="upload-tip">拖拽音频文件到这里，或点击上传</p>
+    <!-- 左侧内容区 -->
+    <div class="content-area">
+      <!-- 空状态 -->
+      <div id="emptyState">
+        <div id="dropZone">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="1">
+            <path d="M19 13v6H5v-6H3v6c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6h-2z"/>
+            <path d="M13 12.67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2v9.67z"/>
+          </svg>
+          <p class="upload-tip">拖拽音频文件到这里，或点击上传</p>
+        </div>
+        <input type="file" id="fileInput" accept=".mp3,.m4a,.mp4">
       </div>
-      <input type="file" id="fileInput" accept=".mp3,.m4a,.mp4">
+
+      <!-- 加载状态 -->
+      <div id="loadedState">
+        <canvas id="waveform"></canvas>
+      </div>
+
+      <!-- 加载遮罩层 -->
+      <div id="loadingMask">
+        <div class="loading-content">
+          <div class="loading-spinner"></div>
+          <div class="loading-text">正在处理音频文件...</div>
+        </div>
+      </div>
     </div>
 
-    <!-- 加载状态 -->
-    <div id="loadedState">
-      <canvas id="waveform"></canvas>
-    </div>
-
-    <!-- 加载遮罩层 -->
-    <div id="loadingMask">
-      <div class="loading-content">
-        <div class="loading-spinner"></div>
-        <div class="loading-text">正在处理音频文件...</div>
+    <!-- 右侧控制面板 -->
+    <div class="control-panel">
+      <div class="mark-list">
+        <!-- 标记列表将通过 JS 动态插入 -->
+        <div style="color: #666; text-align: center;">暂无标记</div>
+      </div>
+      <div class="control-buttons">
+        <button class="mark-button" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/>
+          </svg>
+          添加标记
+        </button>
+        <button class="clear-button" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
+          </svg>
+          清除标记
+        </button>
       </div>
     </div>
   </div>
