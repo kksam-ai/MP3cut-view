@@ -13,9 +13,26 @@ const markBtn = document.getElementById('markBtn');
 const exportBtn = document.getElementById('exportBtn');
 const openFileBtn = document.getElementById('openFileBtn');
 const mainContent = document.querySelector('.main-content');
+const loadingMask = document.getElementById('loadingMask');
 
 // 支持的音频格式
 const SUPPORTED_FORMATS = ['.m4a', '.mp3', '.mp4'];
+
+// 显示加载遮罩
+function showLoading() {
+  loadingMask.style.display = 'flex';
+  // 强制重绘
+  loadingMask.offsetHeight;
+  loadingMask.classList.add('visible');
+}
+
+// 隐藏加载遮罩
+function hideLoading() {
+  loadingMask.classList.remove('visible');
+  setTimeout(() => {
+    loadingMask.style.display = 'none';
+  }, 300); // 等待过渡动画完成
+}
 
 // 处理音频数据
 async function processAudioData(arrayBuffer) {
@@ -84,9 +101,12 @@ function computeWaveform(audioBuffer) {
 
 // 处理文件
 async function handleFile(file) {
+  showLoading();
+
   // 检查文件格式
   const extension = file.name.toLowerCase().match(/\.[^.]*$/)?.[0];
   if (!extension || !SUPPORTED_FORMATS.includes(extension)) {
+    hideLoading();
     alert('不支持的文件格式!');
     return;
   }
@@ -118,12 +138,15 @@ async function handleFile(file) {
     // 设置波形，传入波形数据和音频时长
     requestAnimationFrame(() => {
       waveformView.setWaveform(audioData.waveform, audioData.duration);
+      // 波形渲染完成后隐藏加载遮罩
+      hideLoading();
     });
 
     // 删除临时文件
     await fs.promises.unlink(result.path);
 
   } catch (error) {
+    hideLoading();
     alert('处理文件时出错: ' + error.message);
   }
 }

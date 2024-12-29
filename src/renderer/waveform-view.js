@@ -145,6 +145,11 @@ class WaveformView {
         this.canvas.width = 0;
         this.canvas.height = 0;
 
+        // 重置滚动条状态
+        if (this.container) {
+          this.container.style.overflowY = 'hidden';
+        }
+
         // 重新设置尺寸和渲染
         this.resize();
       } catch (error) {
@@ -215,8 +220,22 @@ class WaveformView {
   checkScrollbar() {
     if (!this.container) return;
 
+    // 强制重新计算布局
+    this.container.style.overflowY = 'hidden';
+    void this.container.offsetHeight; // 触发重排
+
     const needsScroll = this.canvas.offsetHeight > this.container.clientHeight;
+
+    // 设置新的overflow状态
     this.container.style.overflowY = needsScroll ? 'overlay' : 'hidden';
+
+    // 再次检查以确保状态正确
+    requestAnimationFrame(() => {
+      const needsScrollRecheck = this.canvas.offsetHeight > this.container.clientHeight;
+      if (needsScrollRecheck !== needsScroll) {
+        this.container.style.overflowY = needsScrollRecheck ? 'overlay' : 'hidden';
+      }
+    });
   }
 
   // 调整Canvas大小
@@ -255,8 +274,14 @@ class WaveformView {
     }
 
     // 在设置完 canvas 尺寸后检查滚动条
+    // 使用多次检查确保状态正确
+    this.checkScrollbar();
     requestAnimationFrame(() => {
       this.checkScrollbar();
+      // 再次检查以处理边缘情况
+      setTimeout(() => {
+        this.checkScrollbar();
+      }, 100);
     });
   }
 
