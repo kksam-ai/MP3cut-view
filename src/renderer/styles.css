@@ -1,0 +1,31 @@
+/* 修改滚动条行为 */
+.main-content {
+  background-color: #fff;
+  overflow-y: overlay; /* 使用 overlay 而不是 auto */
+}
+
+/* 为不支持 overlay 的浏览器提供回退方案 */
+@supports not (overflow-y: overlay) {
+  .main-content {
+    overflow-y: auto;
+  }
+}
+
+/* 自定义滚动条样式，使其在需要时才显示 */
+.main-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.main-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.main-content::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+/* 只在悬停时显示滚动条 */
+.main-content:not(:hover)::-webkit-scrollbar-thumb {
+  background: transparent;
+}

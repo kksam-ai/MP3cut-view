@@ -20,6 +20,12 @@ class WaveformView {
     // 缓存设备像素比
     this.dpr = window.devicePixelRatio;
 
+    // 添加容器引用
+    this.container = canvas.parentElement;
+
+    // 绑定滚动条检查方法
+    this.checkScrollbar = this.checkScrollbar.bind(this);
+
     // 初始化
     this.resize();
 
@@ -205,6 +211,14 @@ class WaveformView {
     };
   }
 
+  // 检查是否需要滚动条
+  checkScrollbar() {
+    if (!this.container) return;
+
+    const needsScroll = this.canvas.offsetHeight > this.container.clientHeight;
+    this.container.style.overflowY = needsScroll ? 'overlay' : 'hidden';
+  }
+
   // 调整Canvas大小
   resize() {
     // 如果canvas不可见，直接返回
@@ -239,6 +253,11 @@ class WaveformView {
     if (this.processedData) {
       this.render();
     }
+
+    // 在设置完 canvas 尺寸后检查滚动条
+    requestAnimationFrame(() => {
+      this.checkScrollbar();
+    });
   }
 
   // 渲染波形（后续实现）
