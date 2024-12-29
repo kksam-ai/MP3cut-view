@@ -91,13 +91,22 @@ class WaveformView {
     }
 
     try {
-      // 计算需要的总波形条数
-      // 1秒 = 1000ms / 66.67ms ≈ 15个波形条
-      const barsPerSecond = 1000 / 66.67;
-      const totalBars = Math.ceil(this.audioDuration * barsPerSecond);
+      // 使用目标波形条密度计算总条数
+      // 保持每秒15条的密度（与原来相同）
+      const BARS_PER_SECOND = 15;
+      const totalBars = Math.ceil(this.audioDuration * BARS_PER_SECOND);
 
       // 计算每个波形条对应的原始数据点数
       const samplesPerBar = Math.ceil(data.length / totalBars);
+
+      // 记录采样参数
+      console.log('Waveform sampling parameters:', {
+        audioDuration: this.audioDuration,
+        barsPerSecond: BARS_PER_SECOND,
+        totalBars,
+        dataLength: data.length,
+        samplesPerBar
+      });
 
       // 使用峰值检测处理原始数据
       const processedData = this.detectPeaks(data, samplesPerBar);
@@ -114,12 +123,12 @@ class WaveformView {
         normalizedData[i] = processedData[i] / maxAmplitude;
       }
 
-      console.log('Waveform processing stats:', {
-        audioDuration: this.audioDuration,
-        barsPerSecond,
-        totalBars,
-        samplesPerBar,
-        processedLength: normalizedData.length
+      // 验证结果
+      console.log('Waveform processing results:', {
+        expectedBars: totalBars,
+        actualBars: normalizedData.length,
+        firstFewSamples: Array.from(normalizedData.slice(0, 5)),
+        lastFewSamples: Array.from(normalizedData.slice(-5))
       });
 
       return normalizedData;
@@ -399,12 +408,28 @@ class WaveformView {
     if (!this.processedData) return null;
 
     const layout = this.calculateLayout();
-    const pixelsPerSecond = this.PIXELS_PER_SECOND * this.dpr;
-    const totalPixels = this.playbackPosition * pixelsPerSecond;
+
+    // 计算当前播放位置对应的波形索引
+    // 使用音频总时长和波形总条数建立映射
+    const progress = this.playbackPosition / this.audioDuration;
+    const totalBars = this.processedData.length;
+    const currentBar = Math.floor(progress * totalBars);
 
     // 计算行号和行内偏移
-    const row = Math.floor(totalPixels / layout.rowWidth);
-    const offset = totalPixels % layout.rowWidth;
+    const row = Math.floor(currentBar / layout.barsPerRow);
+    const barsInThisRow = currentBar % layout.barsPerRow;
+    const offset = barsInThisRow * layout.barTotalWidth;
+
+    // 添加详细日志
+    console.log('Playback position calculation:', {
+      time: this.playbackPosition,
+      duration: this.audioDuration,
+      progress,
+      totalBars,
+      currentBar,
+      row,
+      offset
+    });
 
     return {
       row,
@@ -421,16 +446,25 @@ class WaveformView {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // 计算点击位置对应的时间
+    // 计算点击位置对应的波形条索引
     const layout = this.calculateLayout();
     const rowIndex = Math.floor(y / (this.LINE_HEIGHT + this.LINE_GAP));
-    const rowOffset = x * this.dpr;
+    const clickedBar = rowIndex * layout.barsPerRow + Math.floor(x / (this.BAR_WIDTH + this.BAR_GAP));
 
-    // 计算总像素偏移
-    const totalPixels = (rowIndex * layout.rowWidth + rowOffset) / this.dpr;
+    // 使用波形条索引比例计算时间
+    const progress = clickedBar / this.processedData.length;
+    const time = progress * this.audioDuration;
 
-    // 转换为时间
-    const time = totalPixels / this.PIXELS_PER_SECOND;
+    // 添加调试日志
+    console.log('Click position calculation:', {
+      x,
+      y,
+      rowIndex,
+      clickedBar,
+      totalBars: this.processedData.length,
+      progress,
+      time
+    });
 
     // 确保时间在有效范围内
     if (time >= 0 && time <= this.audioDuration) {

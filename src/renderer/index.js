@@ -63,8 +63,12 @@ function computeWaveform(channelData, duration) {
   const PIXELS_PER_SECOND = 45;
   const BAR_WIDTH = 2;
   const BAR_GAP = 1;
+  // 计算每秒的波形条数
+  const BARS_PER_SECOND = PIXELS_PER_SECOND / (BAR_WIDTH + BAR_GAP);
+
+  // 计算总的波形条数
   const samplesNeeded = Math.ceil(
-    duration * (PIXELS_PER_SECOND / (BAR_WIDTH + BAR_GAP))
+    duration * BARS_PER_SECOND
   );
 
   // 使用实际需要的采样点数
@@ -99,7 +103,8 @@ function computeWaveform(channelData, duration) {
     originalLength: channelData.length,
     samplesNeeded,
     actualSamples: samples,
-    blockSize
+    blockSize,
+    barsPerSecond: BARS_PER_SECOND
   });
 
   return {
