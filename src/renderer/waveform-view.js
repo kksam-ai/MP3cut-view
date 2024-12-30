@@ -45,6 +45,18 @@ class WaveformView {
     // 绑定事件处理
     this._handleClick = this._handleClick.bind(this);
     this.canvas.addEventListener('click', this._handleClick);
+
+    // 添加标记相关的属性
+    this.marks = [];
+    this.selectedMarkId = null;
+    this.isDraggingMark = false;
+    this.markWidth = 10; // 标记图标的宽度
+    this.markHeight = 20; // 标记图标的高度
+
+    // 绑定标记相关的事件处理
+    this.canvas.addEventListener('mousedown', this.handleMarkMouseDown.bind(this));
+    this.canvas.addEventListener('mousemove', this.handleMarkMouseMove.bind(this));
+    this.canvas.addEventListener('mouseup', this.handleMarkMouseUp.bind(this));
   }
 
   // 添加峰值检测函数
@@ -369,6 +381,9 @@ class WaveformView {
         this.LINE_HEIGHT * this.dpr  // 90px高度
       );
     }
+
+    // 绘制标记
+    this.renderMarks();
   }
 
   // 设置播放位置
@@ -485,6 +500,127 @@ class WaveformView {
       cancelAnimationFrame(this._animationFrame);
       this._animationFrame = null;
     }
+  }
+
+  // 设置标记数据
+  setMarks(marks) {
+    this.marks = marks;
+    this.render();
+  }
+
+  // 绘制标记
+  renderMarks() {
+    const ctx = this.context;
+    const layout = this.calculateLayout();
+
+    this.marks.forEach(mark => {
+      const position = this.timeToPosition(mark.time);
+      const row = Math.floor(position.x / layout.rowWidth);
+      const x = position.x - row * layout.rowWidth;
+      const y = row * (layout.rowHeight + layout.rowGap);
+
+      // 根据标记类型设置颜色
+      ctx.fillStyle = mark.type === 'start' ? '#4CAF50' : '#F44336';
+
+      // 绘制标记图标
+      ctx.beginPath();
+      if (mark.type === 'start') {
+        // 绘制绿色开始标记(向右的三角形)
+        ctx.moveTo(x, y);
+        ctx.lineTo(x, y + this.markHeight);
+        ctx.lineTo(x + this.markWidth, y + this.markHeight/2);
+      } else {
+        // 绘制红色结束标记(向左的三角形)
+        ctx.moveTo(x + this.markWidth, y);
+        ctx.lineTo(x + this.markWidth, y + this.markHeight);
+        ctx.lineTo(x, y + this.markHeight/2);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      // 如果标记被选中,绘制高亮效果
+      if (mark.id === this.selectedMarkId) {
+        ctx.strokeStyle = '#FFC107';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    });
+  }
+
+  // 将时间转换为位置
+  timeToPosition(time) {
+    const layout = this.calculateLayout();
+    const pixelsPerSecond = this.PIXELS_PER_SECOND * this.scale;
+    const totalPixels = time * pixelsPerSecond;
+    return {
+      x: totalPixels,
+      row: Math.floor(totalPixels / layout.rowWidth)
+    };
+  }
+
+  // 将位置转换为时间
+  positionToTime(x, row) {
+    const layout = this.calculateLayout();
+    const pixelsPerSecond = this.PIXELS_PER_SECOND * this.scale;
+    const totalPixels = row * layout.rowWidth + x;
+    return totalPixels / pixelsPerSecond;
+  }
+
+  // 检查点击是否命中标记
+  hitTest(x, y) {
+    const layout = this.calculateLayout();
+    const row = Math.floor(y / (layout.rowHeight + layout.rowGap));
+    const rowX = x + row * layout.rowWidth;
+
+    for (const mark of this.marks) {
+      const position = this.timeToPosition(mark.time);
+      const markX = position.x - position.row * layout.rowWidth;
+      const markY = position.row * (layout.rowHeight + layout.rowGap);
+
+      if (Math.abs(x - markX) < this.markWidth &&
+          y >= markY && y <= markY + this.markHeight) {
+        return mark;
+      }
+    }
+    return null;
+  }
+
+  // 处理标记的鼠标按下事件
+  handleMarkMouseDown(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const hitMark = this.hitTest(x, y);
+    if (hitMark) {
+      this.selectedMarkId = hitMark.id;
+      this.isDraggingMark = true;
+      this.render();
+    } else {
+      this.selectedMarkId = null;
+      this.render();
+    }
+  }
+
+  // 处理标记的鼠标移动事件
+  handleMarkMouseMove(e) {
+    if (!this.isDraggingMark || !this.selectedMarkId) return;
+
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const row = Math.floor(y / (this.LINE_HEIGHT + this.LINE_GAP));
+    const time = this.positionToTime(x, row);
+
+    // 触发标记移动事件
+    if (this.onMarkMove) {
+      this.onMarkMove(this.selectedMarkId, time);
+    }
+  }
+
+  // 处理标记的鼠标松开事件
+  handleMarkMouseUp() {
+    this.isDraggingMark = false;
   }
 }
 

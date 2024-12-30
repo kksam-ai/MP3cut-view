@@ -15,12 +15,16 @@ const exportBtn = document.getElementById('exportBtn');
 const openFileBtn = document.getElementById('openFileBtn');
 const mainContent = document.querySelector('.main-content');
 const loadingMask = document.getElementById('loadingMask');
+const MarkManager = require('./mark-manager');
 
 // 支持的音频格式
 const SUPPORTED_FORMATS = ['.m4a', '.mp3', '.mp4'];
 
 // 创建音频播放器实例
 const audioPlayer = new AudioPlayer();
+
+// 在文件顶部的常量声明后添加
+const markManager = new MarkManager();
 
 // 显示加载遮罩
 function showLoading() {
@@ -124,6 +128,10 @@ async function handleFile(file) {
     playBtn.classList.remove('playing');
     playBtn.querySelector('.btn-text').textContent = '播放';
   }
+
+  // 重置标记
+  markManager.clear();
+  updateMarkList();  // 我们稍后会实现这个函数
 
   // 检查文件格式
   const extension = file.name.toLowerCase().match(/\.[^.]*$/)?.[0];
@@ -400,5 +408,64 @@ waveformView.onTimeSelect = (time) => {
   // 如果当前正在播放，继续播放
   if (audioPlayer.isAudioPlaying()) {
     audioPlayer.play();
+  }
+};
+
+// 更新标记列表显示
+function updateMarkList() {
+  const markList = document.querySelector('.mark-list');
+  const marks = markManager.getAllMarks();
+
+  if (marks.length === 0) {
+    markList.innerHTML = '<div class="empty-tip">暂无标记</div>';
+    return;
+  }
+
+  // 按时间排序
+  marks.sort((a, b) => a.time - b.time);
+
+  markList.innerHTML = marks.map(mark => {
+    const isPaired = mark.pairedId !== null;
+    const time = formatDuration(mark.time);
+    const type = mark.type === 'start' ? '开始' : '结束';
+    const typeClass = mark.type === 'start' ? 'mark-start' : 'mark-end';
+    const statusClass = isPaired ? 'mark-paired' : 'mark-unpaired';
+
+    return `
+      <div class="mark-item ${typeClass} ${statusClass}" data-mark-id="${mark.id}">
+        <div class="mark-info">
+          <span class="mark-type">${type}</span>
+          <span class="mark-time">${time}</span>
+        </div>
+        <button class="delete-mark" onclick="removeMark('${mark.id}')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
+          </svg>
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+// 删除标记的处理函数
+window.removeMark = function(id) {
+  markManager.removeMark(id);
+  updateMarkList();
+  waveformView.setMarks(markManager.getAllMarks());
+};
+
+// 在文件顶部添加标记按钮事件处理
+markBtn.addEventListener('click', () => {
+  const currentTime = audioPlayer.getCurrentTime();
+  const mark = markManager.addMark('start', currentTime);
+  updateMarkList();
+  waveformView.setMarks(markManager.getAllMarks());
+});
+
+// 添加标记移动事件处理
+waveformView.onMarkMove = (markId, newTime) => {
+  if (markManager.updateMarkTime(markId, newTime)) {
+    updateMarkList();
+    waveformView.setMarks(markManager.getAllMarks());
   }
 };
