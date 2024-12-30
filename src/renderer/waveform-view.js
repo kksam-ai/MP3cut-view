@@ -162,33 +162,24 @@ class WaveformView {
     this.audioDuration = duration;
     this.playbackPosition = 0;  // 重置播放条位置
     this.stopPlayback();  // 停止之前的播放动画
+    this.marks = [];      // 清除标记数据
+    this.selectedMarkId = null;  // 清除选中状态
 
-    if (this.canvas.offsetWidth > 0) {
-      try {
-        // 重新处理波形数据
-        this.processedData = this.processWaveform(this.waveformData);
-        console.log('Processed waveform data:', {
-          originalLength: data.length,
-          processedLength: this.processedData.length,
-          duration: this.audioDuration
-        });
+    try {
+      // 处理波形数据
+      this.processedData = this.processWaveform(this.waveformData);
 
-        // 强制重新计算布局和尺寸
-        this.canvas.style.width = '';
-        this.canvas.style.height = '';
-        this.canvas.width = 0;
-        this.canvas.height = 0;
+      // 调整大小并重新渲染
+      this.resize();
 
-        // 重置滚动条状态
-        if (this.container) {
-          this.container.style.overflowY = 'hidden';
-        }
-
-        // 重新设置尺寸和渲染
-        this.resize();
-      } catch (error) {
-        console.error('Error in setWaveform:', error);
-      }
+      // 记录处理结果
+      console.log('Processed waveform data:', {
+        originalLength: this.waveformData.length,
+        processedLength: this.processedData.length,
+        duration: this.audioDuration
+      });
+    } catch (error) {
+      console.error('Error in setWaveform:', error);
     }
   }
 
