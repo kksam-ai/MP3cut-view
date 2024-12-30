@@ -669,44 +669,72 @@ class WaveformView {
       const barIndex = this.timeToBarIndex(mark.time);
       const {x, y} = this.barIndexToPixel(barIndex);
 
-      // 转换为物理像素坐标（需要考虑 dpr）
+      // 转换为物理像素坐标
       const physicalX = Math.floor(x * this.dpr);
       const physicalY = Math.floor(y * this.dpr);
       const lineHeight = Math.floor(this.LINE_HEIGHT * this.dpr);
 
-      // 设置基本样式
-      ctx.beginPath();
-      ctx.strokeStyle = mark.type === 'start' ? '#4CAF50' : '#F44336'; // 绿色或红色
-      ctx.fillStyle = mark.type === 'start' ? '#4CAF50' : '#F44336';
-      ctx.lineWidth = 2 * this.dpr; // 2px的旗杆宽度
+      // 设置颜色（根据类型和选中状态）
+      const isStart = mark.type === 'start';
+      const isSelected = mark.id === this.selectedMarkId;
 
-      // 绘制旗杆
-      ctx.moveTo(physicalX, physicalY);
-      ctx.lineTo(physicalX, physicalY + lineHeight);
-      ctx.stroke();
-
-      // 绘制旗帜(三角形)
-      ctx.beginPath();
-      const flagSize = 15 * this.dpr; // 15px的旗帜大小
-      if (mark.type === 'start') {
-        // 绘制向右的三角形
-        ctx.moveTo(physicalX, physicalY);
-        ctx.lineTo(physicalX + flagSize, physicalY + lineHeight/2);
-        ctx.lineTo(physicalX, physicalY + lineHeight);
+      // 使用浅色作为默认颜色，深色作为选中颜色
+      if (isStart) {
+        ctx.fillStyle = isSelected ? '#2E7D32' : '#81C784'; // 深绿/浅绿
       } else {
-        // 绘制向左的三角形
-        ctx.moveTo(physicalX, physicalY + lineHeight/2);
-        ctx.lineTo(physicalX - flagSize, physicalY);
-        ctx.lineTo(physicalX - flagSize, physicalY + lineHeight);
+        ctx.fillStyle = isSelected ? '#C62828' : '#E57373'; // 深红/浅红
       }
-      ctx.closePath();
+
+      // 如果未配对，使用半透明效果
+      if (!mark.pairedId) {
+        ctx.globalAlpha = 0.5;
+      }
+
+      // 绘制整个标记（旗杆和旗帜作为一个路径）
+      ctx.beginPath();
+      const flagSize = Math.floor(15 * this.dpr); // 15px的三角形
+      const poleWidth = Math.floor(2 * this.dpr); // 2px的旗杆宽度
+
+      if (isStart) {
+        // 向右的标记
+        // 从旗杆左上角开始
+        ctx.moveTo(physicalX - poleWidth/2, physicalY);
+        // 画到旗杆左下角
+        ctx.lineTo(physicalX - poleWidth/2, physicalY + lineHeight);
+        // 画到旗杆右下角
+        ctx.lineTo(physicalX + poleWidth/2, physicalY + lineHeight);
+        // 画到旗杆右上角
+        ctx.lineTo(physicalX + poleWidth/2, physicalY + flagSize);
+        // 画到三角形顶点
+        ctx.lineTo(physicalX + flagSize, physicalY + flagSize/2);
+        // 回到旗杆右上方
+        ctx.lineTo(physicalX + poleWidth/2, physicalY);
+        // 闭合路径
+        ctx.closePath();
+      } else {
+        // 向左的标记
+        // 从旗杆右上角开始
+        ctx.moveTo(physicalX + poleWidth/2, physicalY);
+        // 画到旗杆右下角
+        ctx.lineTo(physicalX + poleWidth/2, physicalY + lineHeight);
+        // 画到旗杆左下角
+        ctx.lineTo(physicalX - poleWidth/2, physicalY + lineHeight);
+        // 画到旗杆左上角
+        ctx.lineTo(physicalX - poleWidth/2, physicalY + flagSize);
+        // 画到三角形顶点
+        ctx.lineTo(physicalX - flagSize, physicalY + flagSize/2);
+        // 回到旗杆左上方
+        ctx.lineTo(physicalX - poleWidth/2, physicalY);
+        // 闭合路径
+        ctx.closePath();
+      }
+
+      // 填充整个路径
       ctx.fill();
 
-      // 如果标记被选中,绘制高亮效果
-      if (mark.id === this.selectedMarkId) {
-        ctx.strokeStyle = '#FFC107'; // 黄色高亮
-        ctx.lineWidth = 3 * this.dpr;
-        ctx.stroke();
+      // 重置透明度
+      if (!mark.pairedId) {
+        ctx.globalAlpha = 1.0;
       }
     });
   }
