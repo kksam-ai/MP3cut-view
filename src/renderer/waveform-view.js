@@ -323,12 +323,16 @@ class WaveformView {
   render() {
     if (!this.processedData || this.canvas.width === 0) return;
 
+    // 使用新的 draw 方法替代原有的渲染逻辑
+    this.draw();
+  }
+
+  // 修改 drawWaveform 方法（从原 render 方法中提取波形渲染逻辑）
+  drawWaveform() {
+    if (!this.processedData) return;
+
     const ctx = this.context;
     const layout = this.calculateLayout();
-
-    // 清空画布
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
     // 遍历每一行绘制波形
     for (let row = 0; row < layout.totalRows; row++) {
@@ -366,24 +370,27 @@ class WaveformView {
         );
       }
     }
+  }
 
-    // 渲染播放条
+  // 添加 drawPlayhead 方法（从原 render 方法中提取播放条渲染逻辑）
+  drawPlayhead() {
+    if (!this.processedData) return;
+
+    const layout = this.calculateLayout();
     const playbackPos = this._calculatePlaybackPosition();
+
     if (playbackPos && playbackPos.isVisible) {
       const x = playbackPos.offset;
       const y = playbackPos.row * layout.rowHeight;
 
-      ctx.fillStyle = '#ff9800';  // 橙色
-      ctx.fillRect(
+      this.context.fillStyle = '#ff9800';  // 橙色
+      this.context.fillRect(
         x,
         y,
         2 * this.dpr,  // 2px宽度
         this.LINE_HEIGHT * this.dpr  // 90px高度
       );
     }
-
-    // 绘制标记
-    this.renderMarks();
   }
 
   // 设置播放位置
@@ -508,45 +515,6 @@ class WaveformView {
     this.render();
   }
 
-  // 绘制标记
-  renderMarks() {
-    const ctx = this.context;
-    const layout = this.calculateLayout();
-
-    this.marks.forEach(mark => {
-      const position = this.timeToPosition(mark.time);
-      const row = Math.floor(position.x / layout.rowWidth);
-      const x = position.x - row * layout.rowWidth;
-      const y = row * (layout.rowHeight + layout.rowGap);
-
-      // 根据标记类型设置颜色
-      ctx.fillStyle = mark.type === 'start' ? '#4CAF50' : '#F44336';
-
-      // 绘制标记图标
-      ctx.beginPath();
-      if (mark.type === 'start') {
-        // 绘制绿色开始标记(向右的三角形)
-        ctx.moveTo(x, y);
-        ctx.lineTo(x, y + this.markHeight);
-        ctx.lineTo(x + this.markWidth, y + this.markHeight/2);
-      } else {
-        // 绘制红色结束标记(向左的三角形)
-        ctx.moveTo(x + this.markWidth, y);
-        ctx.lineTo(x + this.markWidth, y + this.markHeight);
-        ctx.lineTo(x, y + this.markHeight/2);
-      }
-      ctx.closePath();
-      ctx.fill();
-
-      // 如果标记被选中,绘制高亮效果
-      if (mark.id === this.selectedMarkId) {
-        ctx.strokeStyle = '#FFC107';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
-    });
-  }
-
   // 将时间转换为位置
   timeToPosition(time) {
     const layout = this.calculateLayout();
@@ -568,20 +536,47 @@ class WaveformView {
 
   // 检查点击是否命中标记
   hitTest(x, y) {
+    if (!this.marks || !this.processedData) return null;
+
+    // 将点击坐标转换为相对于当前行的位置
     const layout = this.calculateLayout();
-    const row = Math.floor(y / (layout.rowHeight + layout.rowGap));
-    const rowX = x + row * layout.rowWidth;
+    const row = Math.floor(y / (this.LINE_HEIGHT + this.LINE_GAP));
 
+    // 遍历所有标记
     for (const mark of this.marks) {
-      const position = this.timeToPosition(mark.time);
-      const markX = position.x - position.row * layout.rowWidth;
-      const markY = position.row * (layout.rowHeight + layout.rowGap);
+      // 使用新的位置计算方法
+      const barIndex = this.timeToBarIndex(mark.time);
+      const {x: markX, y: markY} = this.barIndexToPixel(barIndex);
 
-      if (Math.abs(x - markX) < this.markWidth &&
-          y >= markY && y <= markY + this.markHeight) {
+      // 计算标记的点击检测区域
+      const flagSize = 15; // 与绘制时使用的大小一致
+      let hitBox;
+
+      if (mark.type === 'start') {
+        // 向右的三角形检测区域
+        hitBox = {
+          left: markX,
+          right: markX + flagSize,
+          top: markY,
+          bottom: markY + this.LINE_HEIGHT
+        };
+      } else {
+        // 向左的三角形检测区域
+        hitBox = {
+          left: markX - flagSize,
+          right: markX,
+          top: markY,
+          bottom: markY + this.LINE_HEIGHT
+        };
+      }
+
+      // 检查点击是否在标记的区域内
+      if (x >= hitBox.left && x <= hitBox.right &&
+          y >= hitBox.top && y <= hitBox.bottom) {
         return mark;
       }
     }
+
     return null;
   }
 
@@ -609,8 +604,15 @@ class WaveformView {
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const row = Math.floor(y / (this.LINE_HEIGHT + this.LINE_GAP));
-    const time = this.positionToTime(x, row);
+
+    // 计算新的时间位置
+    const layout = this.calculateLayout();
+    const rowIndex = Math.floor(y / (this.LINE_HEIGHT + this.LINE_GAP));
+    const clickedBar = rowIndex * layout.barsPerRow + Math.floor(x / (this.BAR_WIDTH + this.BAR_GAP));
+
+    // 使用波形条索引比例计算时间
+    const progress = clickedBar / this.processedData.length;
+    const time = progress * this.audioDuration;
 
     // 触发标记移动事件
     if (this.onMarkMove) {
@@ -621,6 +623,92 @@ class WaveformView {
   // 处理标记的鼠标松开事件
   handleMarkMouseUp() {
     this.isDraggingMark = false;
+  }
+
+  // 添加时间转换为波形条索引的方法
+  timeToBarIndex(time) {
+    const progress = time / this.audioDuration;
+    return Math.floor(progress * this.processedData.length);
+  }
+
+  // 添加波形条索引转换为像素坐标的方法
+  barIndexToPixel(barIndex) {
+    const layout = this.calculateLayout();
+    const row = Math.floor(barIndex / layout.barsPerRow);
+    const col = barIndex % layout.barsPerRow;
+    return {
+      x: col * (this.BAR_WIDTH + this.BAR_GAP),
+      y: row * (this.LINE_HEIGHT + this.LINE_GAP)
+    };
+  }
+
+  // 修改绘制方法，确保正确的渲染顺序
+  draw() {
+    // 1. 清除画布
+    this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // 2. 绘制波形（最底层）
+    this.drawWaveform();
+
+    // 3. 绘制标记（中间层）
+    this.drawMarks();
+
+    // 4. 绘制播放条（最上层）
+    this.drawPlayhead();
+  }
+
+  // 实现标记绘制方法
+  drawMarks() {
+    if (!this.marks || !this.processedData) return;
+
+    const ctx = this.context;
+    const layout = this.calculateLayout();
+
+    this.marks.forEach(mark => {
+      // 计算标记位置
+      const barIndex = this.timeToBarIndex(mark.time);
+      const {x, y} = this.barIndexToPixel(barIndex);
+
+      // 转换为物理像素坐标（需要考虑 dpr）
+      const physicalX = Math.floor(x * this.dpr);
+      const physicalY = Math.floor(y * this.dpr);
+      const lineHeight = Math.floor(this.LINE_HEIGHT * this.dpr);
+
+      // 设置基本样式
+      ctx.beginPath();
+      ctx.strokeStyle = mark.type === 'start' ? '#4CAF50' : '#F44336'; // 绿色或红色
+      ctx.fillStyle = mark.type === 'start' ? '#4CAF50' : '#F44336';
+      ctx.lineWidth = 2 * this.dpr; // 2px的旗杆宽度
+
+      // 绘制旗杆
+      ctx.moveTo(physicalX, physicalY);
+      ctx.lineTo(physicalX, physicalY + lineHeight);
+      ctx.stroke();
+
+      // 绘制旗帜(三角形)
+      ctx.beginPath();
+      const flagSize = 15 * this.dpr; // 15px的旗帜大小
+      if (mark.type === 'start') {
+        // 绘制向右的三角形
+        ctx.moveTo(physicalX, physicalY);
+        ctx.lineTo(physicalX + flagSize, physicalY + lineHeight/2);
+        ctx.lineTo(physicalX, physicalY + lineHeight);
+      } else {
+        // 绘制向左的三角形
+        ctx.moveTo(physicalX, physicalY + lineHeight/2);
+        ctx.lineTo(physicalX - flagSize, physicalY);
+        ctx.lineTo(physicalX - flagSize, physicalY + lineHeight);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      // 如果标记被选中,绘制高亮效果
+      if (mark.id === this.selectedMarkId) {
+        ctx.strokeStyle = '#FFC107'; // 黄色高亮
+        ctx.lineWidth = 3 * this.dpr;
+        ctx.stroke();
+      }
+    });
   }
 }
 
