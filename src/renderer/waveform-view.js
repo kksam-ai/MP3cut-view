@@ -729,6 +729,11 @@ class WaveformView {
       }
     });
   }
+
+  // 添加获取波形数据的方法
+  getWaveformData() {
+    return this.processedData;
+  }
 }
 
 module.exports = WaveformView;

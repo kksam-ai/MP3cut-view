@@ -32,6 +32,35 @@ const endMarkBtn = document.querySelector('.mark-btn.end-mark');
 // 获取清空标记按钮
 const clearMarksBtn = document.querySelector('.clear-marks');
 
+// 获取自动标记相关元素
+const thresholdSlider = document.getElementById('thresholdSlider');
+const silenceSlider = document.getElementById('silenceSlider');
+const thresholdValue = thresholdSlider.parentElement.querySelector('.slider-value');
+const silenceValue = silenceSlider.parentElement.querySelector('.slider-value');
+const autoMarkBtn = document.querySelector('.auto-mark-btn');
+
+// 设置默认参数
+const DEFAULT_THRESHOLD = 3;   // 3% 的最大振幅
+const DEFAULT_SILENCE = 1.0;   // 1.0 秒的留白
+
+// 初始化滑块值
+thresholdSlider.value = DEFAULT_THRESHOLD;
+silenceSlider.value = DEFAULT_SILENCE;
+thresholdValue.textContent = `${DEFAULT_THRESHOLD}%`;
+silenceValue.textContent = `${DEFAULT_SILENCE}s`;
+
+// 更新阈值显示
+thresholdSlider.addEventListener('input', (e) => {
+  const value = e.target.value;
+  thresholdValue.textContent = `${value}%`;
+});
+
+// 更新留白显示
+silenceSlider.addEventListener('input', (e) => {
+  const value = e.target.value;
+  silenceValue.textContent = `${value}s`;
+});
+
 // 启用按钮时同时启用标记按钮
 function enableButtons() {
   playBtn.disabled = false;
@@ -39,6 +68,7 @@ function enableButtons() {
   startMarkBtn.disabled = false;
   endMarkBtn.disabled = false;
   clearMarksBtn.disabled = false;
+  autoMarkBtn.disabled = false;
 }
 
 // 禁用按钮时同时禁用标记按钮
@@ -48,6 +78,7 @@ function disableButtons() {
   startMarkBtn.disabled = true;
   endMarkBtn.disabled = true;
   clearMarksBtn.disabled = true;
+  autoMarkBtn.disabled = true;
 }
 
 // 显示加载遮罩
@@ -516,4 +547,134 @@ clearMarksBtn.addEventListener('click', () => {
     // 更新波形视图
     waveformView.setMarks([]);
   }
+});
+
+// 自动标记功能
+function autoMark(waveformData, threshold, silenceDuration) {
+  const marks = [];
+  let isInSilence = false;
+  let silenceStart = 0;
+  let silenceCount = 0;
+  let lastMarkType = null;
+  let segmentStart = 0;  // 记录当前段落的开始时间
+  let validSampleCount = 0;  // 记录有效样本数量
+  let totalSampleCount = 0;  // 记录总样本数量
+  let maxAmplitude = 0;  // 记录最大振幅
+
+  const samplesPerSecond = waveformData.length / audioPlayer.getDuration();
+  const silenceSamples = Math.floor(silenceDuration * samplesPerSecond);
+  const normalizedThreshold = threshold / 100;
+  const MIN_SEGMENT_DURATION = 1.0;  // 最小段落时长（秒）
+  const MIN_VALID_RATIO = 0.3;       // 最小有效内容比例
+  const MIN_AMPLITUDE_THRESHOLD = normalizedThreshold * 2;  // 最小有效振幅阈值
+
+  // 添加初始标记
+  marks.push({
+    type: 'start',
+    time: 0
+  });
+  lastMarkType = 'start';
+  segmentStart = 0;
+
+  // 检查段落是否有效
+  function isValidSegment(start, end) {
+    const duration = end - start;
+    const validRatio = validSampleCount / totalSampleCount;
+
+    return duration >= MIN_SEGMENT_DURATION &&
+           validRatio >= MIN_VALID_RATIO &&
+           maxAmplitude >= MIN_AMPLITUDE_THRESHOLD;
+  }
+
+  // 遍历波形数据
+  for (let i = 0; i < waveformData.length; i++) {
+    const amplitude = waveformData[i];
+    const time = i / samplesPerSecond;
+
+    if (amplitude < normalizedThreshold) {
+      // 在静音区域
+      if (!isInSilence) {
+        silenceStart = time;
+        isInSilence = true;
+      }
+      silenceCount++;
+    } else {
+      // 在有声音区域
+      if (isInSilence && silenceCount >= silenceSamples) {
+        // 找到一个足够长的静音段
+        // 检查前一个段落是否有效
+        if (isValidSegment(segmentStart, silenceStart)) {
+          marks.push({
+            type: 'end',
+            time: silenceStart
+          });
+          lastMarkType = 'end';
+
+          // 如果不是最后一个样本，添加开始标记
+          if (i < waveformData.length - 1) {
+            marks.push({
+              type: 'start',
+              time: time
+            });
+            lastMarkType = 'start';
+            // 重置段落统计
+            segmentStart = time;
+            validSampleCount = 0;
+            totalSampleCount = 0;
+            maxAmplitude = 0;
+          }
+        }
+      }
+      isInSilence = false;
+      silenceCount = 0;
+
+      // 统计有效样本
+      if (amplitude >= normalizedThreshold) {
+        validSampleCount++;
+        maxAmplitude = Math.max(maxAmplitude, amplitude);
+      }
+      totalSampleCount++;
+    }
+  }
+
+  // 处理最后一个段落
+  if (lastMarkType === 'start') {
+    const endTime = audioPlayer.getDuration();
+    if (isValidSegment(segmentStart, endTime)) {
+      marks.push({
+        type: 'end',
+        time: endTime
+      });
+    } else {
+      // 如果最后一个段落无效，移除对应的开始标记
+      marks.pop();
+    }
+  }
+
+  return marks;
+}
+
+// 添加自动标记按钮事件
+autoMarkBtn.addEventListener('click', () => {
+  // 获取当前设置的参数
+  const threshold = parseFloat(thresholdSlider.value);
+  const silence = parseFloat(silenceSlider.value);
+
+  // 获取波形数据
+  const waveformData = waveformView.getWaveformData();
+
+  // 清除现有标记
+  markManager.clear();
+
+  // 执行自动标记
+  const marks = autoMark(waveformData, threshold, silence);
+
+  // 添加标记
+  marks.forEach(mark => {
+    markManager.addMark(mark.type, mark.time);
+  });
+
+  // 更新界面
+  updateMarkList();
+  waveformView.setMarks(markManager.getAllMarks());
 });
