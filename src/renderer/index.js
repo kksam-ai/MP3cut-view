@@ -29,12 +29,16 @@ const markManager = new MarkManager();
 const startMarkBtn = document.querySelector('.mark-btn.start-mark');
 const endMarkBtn = document.querySelector('.mark-btn.end-mark');
 
+// 获取清空标记按钮
+const clearMarksBtn = document.querySelector('.clear-marks');
+
 // 启用按钮时同时启用标记按钮
 function enableButtons() {
   playBtn.disabled = false;
   exportBtn.disabled = false;
   startMarkBtn.disabled = false;
   endMarkBtn.disabled = false;
+  clearMarksBtn.disabled = false;
 }
 
 // 禁用按钮时同时禁用标记按钮
@@ -43,6 +47,7 @@ function disableButtons() {
   exportBtn.disabled = true;
   startMarkBtn.disabled = true;
   endMarkBtn.disabled = true;
+  clearMarksBtn.disabled = true;
 }
 
 // 显示加载遮罩
@@ -491,4 +496,24 @@ endMarkBtn.addEventListener('click', () => {
   const mark = markManager.addMark('end', currentTime);
   updateMarkList();
   waveformView.setMarks(markManager.getAllMarks());
+});
+
+// 添加清空标记功能
+clearMarksBtn.addEventListener('click', () => {
+  // 如果没有标记，直接返回
+  if (markManager.getAllMarks().length === 0) {
+    return;
+  }
+
+  // 显示确认对话框
+  const confirmed = confirm('确定要清空所有标记吗？此操作不可撤销。');
+
+  if (confirmed) {
+    // 清空标记
+    markManager.clear();
+    // 更新标记列表显示
+    updateMarkList();
+    // 更新波形视图
+    waveformView.setMarks([]);
+  }
 });
