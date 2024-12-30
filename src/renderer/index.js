@@ -10,7 +10,6 @@ const fs = require('fs');
 const emptyState = document.getElementById('emptyState');
 const loadedState = document.getElementById('loadedState');
 const playBtn = document.getElementById('playBtn');
-const markBtn = document.getElementById('markBtn');
 const exportBtn = document.getElementById('exportBtn');
 const openFileBtn = document.getElementById('openFileBtn');
 const mainContent = document.querySelector('.main-content');
@@ -25,6 +24,26 @@ const audioPlayer = new AudioPlayer();
 
 // 在文件顶部的常量声明后添加
 const markManager = new MarkManager();
+
+// 获取手动标记按钮
+const startMarkBtn = document.querySelector('.mark-btn.start-mark');
+const endMarkBtn = document.querySelector('.mark-btn.end-mark');
+
+// 启用按钮时同时启用标记按钮
+function enableButtons() {
+  playBtn.disabled = false;
+  exportBtn.disabled = false;
+  startMarkBtn.disabled = false;
+  endMarkBtn.disabled = false;
+}
+
+// 禁用按钮时同时禁用标记按钮
+function disableButtons() {
+  playBtn.disabled = true;
+  exportBtn.disabled = true;
+  startMarkBtn.disabled = true;
+  endMarkBtn.disabled = true;
+}
 
 // 显示加载遮罩
 function showLoading() {
@@ -161,9 +180,7 @@ async function handleFile(file) {
     loadedState.style.display = 'block';
 
     // 启用按钮
-    playBtn.disabled = false;
-    markBtn.disabled = false;
-    exportBtn.disabled = false;
+    enableButtons();
 
     // 更新音频信息
     updateAudioInfo(file, audioData);
@@ -178,10 +195,8 @@ async function handleFile(file) {
     console.error('Error processing file:', error);
     hideLoading();
 
-    // 错误处理时重置状态
-    playBtn.disabled = true;
-    markBtn.disabled = true;
-    exportBtn.disabled = true;
+    // 错误处理时禁用所有按钮
+    disableButtons();
 
     // 显示具体错误信息
     alert('处理文件时出错: ' + (error.message || '未知错误'));
@@ -454,14 +469,6 @@ window.removeMark = function(id) {
   waveformView.setMarks(markManager.getAllMarks());
 };
 
-// 在文件顶部添加标记按钮事件处理
-markBtn.addEventListener('click', () => {
-  const currentTime = audioPlayer.getCurrentTime();
-  const mark = markManager.addMark('start', currentTime);
-  updateMarkList();
-  waveformView.setMarks(markManager.getAllMarks());
-});
-
 // 添加标记移动事件处理
 waveformView.onMarkMove = (markId, newTime) => {
   if (markManager.updateMarkTime(markId, newTime)) {
@@ -469,3 +476,19 @@ waveformView.onMarkMove = (markId, newTime) => {
     waveformView.setMarks(markManager.getAllMarks());
   }
 };
+
+// 添加绿旗标记
+startMarkBtn.addEventListener('click', () => {
+  const currentTime = audioPlayer.getCurrentTime();
+  const mark = markManager.addMark('start', currentTime);
+  updateMarkList();
+  waveformView.setMarks(markManager.getAllMarks());
+});
+
+// 添加红旗标记
+endMarkBtn.addEventListener('click', () => {
+  const currentTime = audioPlayer.getCurrentTime();
+  const mark = markManager.addMark('end', currentTime);
+  updateMarkList();
+  waveformView.setMarks(markManager.getAllMarks());
+});
