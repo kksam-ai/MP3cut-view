@@ -105,6 +105,9 @@ async function processAudioData(arrayBuffer) {
   // 使用 AudioBuffer 的准确时长
   const duration = audioInfo.audioBuffer.duration;
 
+  // 更新总时长显示
+  updateTotalTime(duration);
+
   // 使用音频缓冲区数据计算波形
   const waveformData = computeWaveform(audioPlayer.getWaveformData(), duration);
 
@@ -182,6 +185,11 @@ async function handleFile(file) {
     audioPlayer.pause();
     playBtn.classList.remove('playing');
     playBtn.querySelector('.btn-text').textContent = '播放';
+
+    // 重置播放控制按钮状态
+    playbackControl.classList.remove('playing');
+    playbackControl.querySelector('.play-icon').style.display = 'block';
+    playbackControl.querySelector('.pause-icon').style.display = 'none';
   }
 
   // 重置标记
@@ -268,6 +276,13 @@ function updateAudioInfo(file, audioData) {
     </div>
     <div class="info-item">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M2 20h20M4 4h16v16H4z"/>
+        <path d="M8 8h8v8H8z"/>
+      </svg>
+      <span>${formatFileSize(file.size)}</span>
+    </div>
+    <div class="info-item">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/>
         <path d="M12 6v6l4 2"/>
       </svg>
@@ -275,26 +290,30 @@ function updateAudioInfo(file, audioData) {
     </div>
     <div class="info-item">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 2v20M2 12h20"/>
+        <path d="M23 12l-2.44-2.79.34-3.69-3.61-.82-1.89-3.2L12 2.96 8.6 1.5 6.71 4.69 3.1 5.5l.34 3.7L1 12l2.44 2.79-.34 3.7 3.61.82L8.6 22.5l3.4-1.47 3.4 1.46 1.89-3.19 3.61-.82-.34-3.69L23 12z"/>
+        <path d="M12 8v4M12 16h.01"/>
       </svg>
-      <span>${formatFileSize(file.size)}</span>
+      <span>${formatSampleRate(audioData.sampleRate)}</span>
     </div>
   `;
 }
 
 // 格式化时间显示
 function formatDuration(seconds) {
+  // 处理小于0的情况
+  if (seconds < 0) seconds = 0;
+
+  // 计算时、分、秒、毫秒
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  const ms = Math.floor((seconds % 1) * 100);
+  const ms = Math.floor((seconds % 1) * 100);  // 取两位毫秒
 
-  return [
-    hours > 0 ? hours.toString().padStart(2, '0') : null,
-    minutes.toString().padStart(2, '0'),
-    secs.toString().padStart(2, '0'),
-    ms.toString().padStart(2, '0')
-  ].filter(Boolean).join(':');
+  // 格式化为两位数
+  const pad = (num) => String(num).padStart(2, '0');
+
+  // 返回完整格式
+  return `${pad(hours)}:${pad(minutes)}:${pad(secs)}:${pad(ms)}`;
 }
 
 // 格式化文件大小显示
@@ -302,6 +321,11 @@ function formatFileSize(bytes) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// 格式化采样率显示
+function formatSampleRate(sampleRate) {
+  return `${(sampleRate / 1000).toFixed(1)} kHz`;
 }
 
 // 绑定打开文件按钮事件
@@ -433,12 +457,19 @@ audioPlayer.onEnded = () => {
   playBtn.classList.remove('playing');
   playBtn.querySelector('.btn-text').textContent = '播放';
   waveformView.stopPlayback();
+
+  // 重置播放控制按钮状态
+  playbackControl.classList.remove('playing');
+  playbackControl.querySelector('.play-icon').style.display = 'block';
+  playbackControl.querySelector('.pause-icon').style.display = 'none';
 };
 
 // 更新播放位置
 function updatePlaybackPosition() {
   if (audioPlayer.isAudioPlaying()) {
-    waveformView.setPlaybackPosition(audioPlayer.getCurrentTime());
+    const currentTime = audioPlayer.getCurrentTime();
+    waveformView.setPlaybackPosition(currentTime);
+    updatePlaybackTime(currentTime);
     requestAnimationFrame(updatePlaybackPosition);
   }
 }
@@ -455,6 +486,9 @@ waveformView.onTimeSelect = (time) => {
 
   // 更新播放条位置
   waveformView.setPlaybackPosition(time);
+
+  // 更新当前时间显示
+  updatePlaybackTime(time);
 
   // 如果当前正在播放，继续播放
   if (audioPlayer.isAudioPlaying()) {
@@ -678,3 +712,47 @@ autoMarkBtn.addEventListener('click', () => {
   updateMarkList();
   waveformView.setMarks(markManager.getAllMarks());
 });
+
+// 获取播放状态栏元素
+const currentTimeDisplay = document.querySelector('.current-time');
+const totalTimeDisplay = document.querySelector('.total-time');
+const playbackControl = document.querySelector('.playback-control');
+
+// 更新播放时间显示
+function updatePlaybackTime(currentTime) {
+  if (currentTimeDisplay) {
+    currentTimeDisplay.textContent = formatDuration(currentTime);
+  }
+}
+
+// 更新总时长显示
+function updateTotalTime(duration) {
+  totalTimeDisplay.textContent = formatDuration(duration);
+}
+
+// 播放控制按钮点击事件
+playbackControl.addEventListener('click', () => {
+  if (audioPlayer.isAudioPlaying()) {
+    audioPlayer.pause();
+    playbackControl.classList.remove('playing');
+    // 切换图标显示
+    playbackControl.querySelector('.play-icon').style.display = 'block';
+    playbackControl.querySelector('.pause-icon').style.display = 'none';
+  } else {
+    audioPlayer.play();
+    playbackControl.classList.add('playing');
+    // 切换图标显示
+    playbackControl.querySelector('.play-icon').style.display = 'none';
+    playbackControl.querySelector('.pause-icon').style.display = 'block';
+  }
+});
+
+// 在音频加载完成后更新总时长
+audioPlayer.onLoad = (duration) => {
+  updateTotalTime(duration);
+};
+
+// 在播放进度更新时更新当前时间
+audioPlayer.onTimeUpdate = (currentTime) => {
+  updatePlaybackTime(currentTime);
+};

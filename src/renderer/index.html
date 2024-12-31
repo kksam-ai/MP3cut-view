@@ -96,6 +96,20 @@
       padding: 0;
     }
 
+    /* 自定义滚动条样式 */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+    }
+
     /* 控制按钮区域 */
     .control-buttons {
       padding: 16px;
@@ -104,32 +118,18 @@
       gap: 8px;
     }
 
-    /* 调整滚动条样式 */
-    .mark-list::-webkit-scrollbar {
-      width: 8px;
-    }
-
-    .mark-list::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    .mark-list::-webkit-scrollbar-thumb {
-      background-color: rgba(0, 0, 0, 0.2);
-      border-radius: 4px;
-    }
-
     /* 空状态 */
     #emptyState {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
       position: absolute;
       top: 0;
       left: 0;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: transparent;
+      right: 0;
+      bottom: 0;
+      background: #fff;
       z-index: 1;
     }
 
@@ -164,28 +164,98 @@
     /* 加载状态 */
     #loadedState {
       display: none;
-      flex: 1;
-      position: relative;
-      overflow-y: hidden;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
     }
 
-    #loadedState::-webkit-scrollbar {
-      width: 16px;
+    /* 播放状态栏 */
+    .playback-status-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 25px;
+      background: #f5f5f5;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      justify-content: center;
+      gap: 40px;
+      font-size: 12px;
+      color: #666;
     }
 
-    #loadedState::-webkit-scrollbar-track {
-      background: transparent;
+    /* 播放状态栏左侧 */
+    .playback-left {
+      min-width: 80px;
+      text-align: right;
     }
 
-    #loadedState::-webkit-scrollbar-thumb {
-      background-color: rgba(0, 0, 0, 0.2);
-      border: 4px solid transparent;
-      border-radius: 8px;
-      background-clip: padding-box;
+    /* 播放状态栏中间 */
+    .playback-center {
+      display: flex;
+      align-items: center;
     }
 
-    #loadedState::-webkit-scrollbar-thumb:hover {
-      background-color: rgba(0, 0, 0, 0.3);
+    /* 播放状态栏右侧 */
+    .playback-right {
+      min-width: 80px;
+      text-align: left;
+    }
+
+    /* 播放控制按钮 */
+    .playback-control {
+      border: none;
+      background: none;
+      padding: 4px;
+      cursor: pointer;
+      color: #666;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .playback-control:hover {
+      color: #2196f3;
+    }
+
+    .playback-control.playing .play-icon {
+      display: none;
+    }
+
+    .playback-control.playing .pause-icon {
+      display: block;
+    }
+
+    /* 波形显示区域 */
+    .waveform-container {
+      position: absolute;
+      top: 25px;
+      left: 0;
+      right: 0;
+      bottom: 25px;
+      overflow-y: auto;
+      background: #fff;
+    }
+
+    /* 文件状态栏 */
+    .file-status-bar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 25px;
+      background: #f5f5f5;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      font-size: 12px;
+      color: #666;
     }
 
     #waveform {
@@ -198,13 +268,13 @@
 
     /* 底部状态栏 */
     .status-bar {
-      height: 40px;
+      height: 25px;
       padding: 0 20px;
       background: #fff;
       border-top: 1px solid #e0e0e0;
       display: flex;
       align-items: center;
-      font-size: 13px;
+      font-size: 12px;
       color: #666;
       justify-content: flex-start;
       flex-shrink: 0;
@@ -631,7 +701,40 @@
 
       <!-- 加载状态 -->
       <div id="loadedState">
-        <canvas id="waveform"></canvas>
+        <!-- 播放状态栏 -->
+        <div class="playback-status-bar">
+          <div class="playback-left">
+            <span class="current-time" style="color: #2196f3">00:00:00:00</span>
+          </div>
+          <div class="playback-center">
+            <button class="playback-control">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <g class="play-icon">
+                  <polygon points="8 5 19 12 8 19 8 5"/>
+                </g>
+                <g class="pause-icon" style="display: none;">
+                  <rect x="6" y="4" width="4" height="16"/>
+                  <rect x="14" y="4" width="4" height="16"/>
+                </g>
+              </svg>
+            </button>
+          </div>
+          <div class="playback-right">
+            <span class="total-time">00:00:00:00</span>
+          </div>
+        </div>
+
+        <!-- 波形显示区域 -->
+        <div class="waveform-container custom-scrollbar">
+          <canvas id="waveform"></canvas>
+        </div>
+
+        <!-- 文件状态栏 -->
+        <div class="file-status-bar">
+          <div id="audioInfo">
+            <!-- 音频信息将通过 JS 动态插入 -->
+          </div>
+        </div>
       </div>
 
       <!-- 加载遮罩层 -->
@@ -691,17 +794,10 @@
             </svg>
           </button>
         </div>
-        <div class="mark-list">
+        <div class="mark-list custom-scrollbar">
           <div class="empty-tip">暂无标记</div>
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- 底部状态栏 -->
-  <div class="status-bar">
-    <div id="audioInfo">
-      <!-- 音频信息将通过 JS 动态插入 -->
     </div>
   </div>
 
