@@ -16,6 +16,11 @@ const mainContent = document.querySelector('.main-content');
 const loadingMask = document.getElementById('loadingMask');
 const MarkManager = require('./mark-manager');
 
+// 获取播放状态栏元素
+const currentTimeDisplay = document.querySelector('.current-time');
+const totalTimeDisplay = document.querySelector('.total-time');
+const playbackControl = document.querySelector('.playback-control');
+
 // 支持的音频格式
 const SUPPORTED_FORMATS = ['.m4a', '.mp3', '.mp4'];
 
@@ -63,7 +68,6 @@ silenceSlider.addEventListener('input', (e) => {
 
 // 启用按钮时同时启用标记按钮
 function enableButtons() {
-  playBtn.disabled = false;
   exportBtn.disabled = false;
   startMarkBtn.disabled = false;
   endMarkBtn.disabled = false;
@@ -73,7 +77,6 @@ function enableButtons() {
 
 // 禁用按钮时同时禁用标记按钮
 function disableButtons() {
-  playBtn.disabled = true;
   exportBtn.disabled = true;
   startMarkBtn.disabled = true;
   endMarkBtn.disabled = true;
@@ -183,8 +186,6 @@ async function handleFile(file) {
   // 重置播放状态
   if (audioPlayer.isAudioPlaying()) {
     audioPlayer.pause();
-    playBtn.classList.remove('playing');
-    playBtn.querySelector('.btn-text').textContent = '播放';
 
     // 重置播放控制按钮状态
     playbackControl.classList.remove('playing');
@@ -192,9 +193,12 @@ async function handleFile(file) {
     playbackControl.querySelector('.pause-icon').style.display = 'none';
   }
 
+  // 重置时间显示
+  updatePlaybackTime(0);
+
   // 重置标记
   markManager.clear();
-  updateMarkList();  // 我们稍后会实现这个函数
+  updateMarkList();
 
   // 检查文件格式
   const extension = file.name.toLowerCase().match(/\.[^.]*$/)?.[0];
@@ -421,41 +425,44 @@ dropZoneStyle.textContent = `
 `;
 document.head.appendChild(dropZoneStyle);
 
-// 播放控制
+// 统一的播放/暂停控制函数
 function togglePlay() {
   if (audioPlayer.isAudioPlaying()) {
+    // 暂停播放
     audioPlayer.pause();
-    playBtn.classList.remove('playing');
-    playBtn.querySelector('.btn-text').textContent = '播放';
-    waveformView.stopPlayback();
+
+    // 更新播放状态栏按钮状态
+    playbackControl.classList.remove('playing');
+    playbackControl.querySelector('.play-icon').style.display = 'block';
+    playbackControl.querySelector('.pause-icon').style.display = 'none';
   } else {
+    // 开始播放
     audioPlayer.play();
-    playBtn.classList.add('playing');
-    playBtn.querySelector('.btn-text').textContent = '暂停';
-    waveformView.startPlayback();
+
+    // 更新播放状态栏按钮状态
+    playbackControl.classList.add('playing');
+    playbackControl.querySelector('.play-icon').style.display = 'none';
+    playbackControl.querySelector('.pause-icon').style.display = 'block';
   }
 }
 
-// 绑定播放按钮事件
-playBtn.addEventListener('click', togglePlay);
+// 更新播放状态栏按钮事件
+playbackControl.addEventListener('click', togglePlay);
 
-// 绑定空格键控制
+// 更新空格键事件
 document.addEventListener('keydown', (e) => {
-  // 如果正在编辑输入框，不处理空格键
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
     return;
   }
 
-  if (e.code === 'Space' && !playBtn.disabled) {
-    e.preventDefault(); // 防止页面滚动
+  if (e.code === 'Space' && !exportBtn.disabled) {
+    e.preventDefault();
     togglePlay();
   }
 });
 
 // 监听播放结束
 audioPlayer.onEnded = () => {
-  playBtn.classList.remove('playing');
-  playBtn.querySelector('.btn-text').textContent = '播放';
   waveformView.stopPlayback();
 
   // 重置播放控制按钮状态
@@ -713,11 +720,6 @@ autoMarkBtn.addEventListener('click', () => {
   waveformView.setMarks(markManager.getAllMarks());
 });
 
-// 获取播放状态栏元素
-const currentTimeDisplay = document.querySelector('.current-time');
-const totalTimeDisplay = document.querySelector('.total-time');
-const playbackControl = document.querySelector('.playback-control');
-
 // 更新播放时间显示
 function updatePlaybackTime(currentTime) {
   if (currentTimeDisplay) {
@@ -729,23 +731,6 @@ function updatePlaybackTime(currentTime) {
 function updateTotalTime(duration) {
   totalTimeDisplay.textContent = formatDuration(duration);
 }
-
-// 播放控制按钮点击事件
-playbackControl.addEventListener('click', () => {
-  if (audioPlayer.isAudioPlaying()) {
-    audioPlayer.pause();
-    playbackControl.classList.remove('playing');
-    // 切换图标显示
-    playbackControl.querySelector('.play-icon').style.display = 'block';
-    playbackControl.querySelector('.pause-icon').style.display = 'none';
-  } else {
-    audioPlayer.play();
-    playbackControl.classList.add('playing');
-    // 切换图标显示
-    playbackControl.querySelector('.play-icon').style.display = 'none';
-    playbackControl.querySelector('.pause-icon').style.display = 'block';
-  }
-});
 
 // 在音频加载完成后更新总时长
 audioPlayer.onLoad = (duration) => {

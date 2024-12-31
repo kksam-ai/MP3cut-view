@@ -11,6 +11,11 @@
       box-sizing: border-box;
     }
 
+    /* 移除按钮的焦点边框 */
+    button:focus-visible {
+      outline: none;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
       height: 100vh;
@@ -657,20 +662,6 @@
         <path d="M3 19h18v-2H3v2zm0-6h18v-2H3v2zm0-8v2h18V5H3z"/>
       </svg>
       打开文件
-    </button>
-
-    <div class="separator"></div>
-
-    <button id="playBtn" disabled>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <g class="play-icon">
-          <polygon points="5 3 19 12 5 21 5 3"/>
-        </g>
-        <g class="pause-icon" style="display: none;">
-          <path d="M5 3h4v18H5zM15 3h4v18h-4z" stroke="none"/>
-        </g>
-      </svg>
-      <span class="btn-text">播放</span>
     </button>
 
     <div class="separator"></div>
