@@ -736,8 +736,3 @@ function updateTotalTime(duration) {
 audioPlayer.onLoad = (duration) => {
   updateTotalTime(duration);
 };
-
-// 在播放进度更新时更新当前时间
-audioPlayer.onTimeUpdate = (currentTime) => {
-  updatePlaybackTime(currentTime);
-};
