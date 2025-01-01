@@ -39,6 +39,50 @@ const MetadataError = {
 };
 
 /**
+ * 深度冻结对象及其所有嵌套属性
+ * @param {Object} obj - 需要冻结的对象
+ * @returns {Object} 被冻结的对象
+ */
+function deepFreeze(obj) {
+  // 获取所有属性，包括不可枚举的
+  const propNames = Object.getOwnPropertyNames(obj);
+
+  // 在冻结自身之前先冻结属性
+  propNames.forEach(name => {
+    const prop = obj[name];
+
+    // 如果prop是对象且不为null，则递归冻结
+    if (prop && typeof prop === 'object' && !Array.isArray(prop)) {
+      deepFreeze(prop);
+    }
+  });
+
+  // 冻结自身
+  return Object.freeze(obj);
+}
+
+/**
+ * 验证元数据对象的不可变性
+ * @param {Object} metadata - 元数据对象
+ * @throws {Error} 如果发现可变对象则抛出错误
+ */
+function validateMetadataImmutability(metadata) {
+  if (!Object.isFrozen(metadata)) {
+    throw new Error('Metadata object is not frozen');
+  }
+
+  Object.entries(metadata).forEach(([key, value]) => {
+    if (value && typeof value === 'object') {
+      if (!Object.isFrozen(value)) {
+        throw new Error(`Nested object "${key}" is not frozen`);
+      }
+      // 递归检查嵌套对象
+      validateMetadataImmutability(value);
+    }
+  });
+}
+
+/**
  * 创建音频元数据对象
  * @param {File} file - 音频文件对象
  * @param {Object} audioData - 音频解析数据
@@ -46,77 +90,46 @@ const MetadataError = {
  * @throws {Error} 如果参数无效或数据缺失
  */
 function createAudioMetadata(file, audioData) {
-  try {
-    // 验证文件对象
-    const fileValidation = validateFile(file);
-    if (!fileValidation.isValid) {
-      throw new AudioMetadataError(
-        MetadataError.VALIDATION_ERROR.code,
-        MetadataError.VALIDATION_ERROR.message,
-        fileValidation.errors
-      );
-    }
-
-    // 验证音频数据
-    const audioValidation = validateAudioData(audioData);
-    if (!audioValidation.isValid) {
-      throw new AudioMetadataError(
-        MetadataError.VALIDATION_ERROR.code,
-        MetadataError.VALIDATION_ERROR.message,
-        audioValidation.errors
-      );
-    }
-
-    // 提取文件信息
-    const fileMetadata = {
-      name: file.name,                      // 文件名
-      path: file.path,                      // 完整路径
-      directory: getDirectory(file.path),    // 目录路径
-      size: file.size,                      // 文件大小
-      type: file.type,                      // MIME类型
-      extension: getExtension(file.name),    // 扩展名
-      lastModified: new Date(file.lastModified) // 修改时间
-    };
-
-    // 提取音频参数
-    const audioParams = {
-      sampleRate: audioData.sampleRate || 0,
-      bitRate: audioData.bitRate || 0,
-      channels: audioData.channels || 0,
-      codec: audioData.codec || '',
-      duration: audioData.duration || 0,
-      format: audioData.format || ''
-    };
-
-    // 提取标签信息(如果有)
-    const tags = {
-      title: audioData.tags?.title || '',
-      artist: audioData.tags?.artist || '',
-      album: audioData.tags?.album || '',
-      year: audioData.tags?.year || ''
-    };
-
-    // 创建元数据对象
-    const metadata = {
-      fileMetadata: Object.freeze(fileMetadata),
-      audioParams: Object.freeze(audioParams),
-      tags: Object.freeze(tags)
-    };
-
-    // 返回不可变对象
-    return Object.freeze(metadata);
-  } catch (error) {
-    // 如果已经是 AudioMetadataError 则直接抛出
-    if (error instanceof AudioMetadataError) {
-      throw error;
-    }
-    // 其他错误包装为 AudioMetadataError
-    throw new AudioMetadataError(
-      MetadataError.PARSE_ERROR.code,
-      MetadataError.PARSE_ERROR.message,
-      error.message
-    );
+  // 验证输入
+  const fileValidation = validateFile(file);
+  if (!fileValidation.isValid) {
+    throw new Error(`Invalid file: ${fileValidation.errors.join(', ')}`);
   }
+
+  const audioValidation = validateAudioData(audioData);
+  if (!audioValidation.isValid) {
+    throw new Error(`Invalid audio data: ${audioValidation.errors.join(', ')}`);
+  }
+
+  // 创建元数据对象
+  const metadata = {
+    fileMetadata: {
+      name: file.name,
+      path: file.path,
+      size: file.size,
+      type: file.type,
+      lastModified: new Date(file.lastModified)
+    },
+    audioParams: {
+      sampleRate: audioData.sampleRate,
+      duration: audioData.duration,
+      numberOfChannels: audioData.numberOfChannels,
+      bitRate: audioData.bitRate,
+      format: audioData.format,
+      codec: audioData.codec
+    },
+    tags: audioData.tags || {}
+  };
+
+  // 深度冻结对象
+  const frozenMetadata = deepFreeze(metadata);
+
+  // 在开发环境下验证不可变性
+  if (process.env.NODE_ENV === 'development') {
+    validateMetadataImmutability(frozenMetadata);
+  }
+
+  return frozenMetadata;
 }
 
 /**
