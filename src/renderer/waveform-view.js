@@ -151,15 +151,16 @@ class WaveformView {
   }
 
   // 设置波形数据和时长
-  setWaveform(data, duration) {
-    if (!data || !duration) {
-      console.error('Invalid data or duration');
+  setWaveform(data, metadata) {
+    if (!data || !metadata) {
+      console.error('Invalid data or metadata');
       return;
     }
 
+    // 使用元数据中的时长
+    this.audioDuration = metadata.audioParams.duration;
     // 重置所有状态
     this.waveformData = new Float32Array(data);
-    this.audioDuration = duration;
     this.playbackPosition = 0;  // 重置播放条位置
     this.stopPlayback();  // 停止之前的播放动画
     this.marks = [];      // 清除标记数据

@@ -15,6 +15,12 @@ const openFileBtn = document.getElementById('openFileBtn');
 const mainContent = document.querySelector('.main-content');
 const loadingMask = document.getElementById('loadingMask');
 const MarkManager = require('./mark-manager');
+const {
+  createAudioMetadata,
+  formatFileSize,
+  formatDuration,
+  formatSampleRate
+} = require('./audio-metadata.js');
 
 // 获取播放状态栏元素
 const currentTimeDisplay = document.querySelector('.current-time');
@@ -119,6 +125,9 @@ async function processAudioData(arrayBuffer) {
     duration: duration,
     numberOfChannels: audioInfo.numberOfChannels,
     waveform: waveformData.data,
+    // 添加其他可能需要的音频参数
+    format: 'wav', // 转换后的格式
+    codec: 'pcm' // 转换后的编码
   };
 }
 
@@ -178,6 +187,9 @@ function computeWaveform(channelData, duration) {
   };
 }
 
+// 存储当前音频元数据
+let currentAudioMetadata = null;
+
 // 处理文件
 async function handleFile(file) {
   showLoading();
@@ -223,6 +235,9 @@ async function handleFile(file) {
     // 处理音频数据
     const audioData = await processAudioData(wavData.buffer);
 
+    // 创建音频元数据
+    currentAudioMetadata = createAudioMetadata(file, audioData);
+
     // 切换界面状态
     emptyState.style.display = 'none';
     loadedState.style.display = 'block';
@@ -231,11 +246,11 @@ async function handleFile(file) {
     enableButtons();
 
     // 更新音频信息
-    updateAudioInfo(file, audioData);
+    updateAudioInfo(currentAudioMetadata);
 
     // 设置波形
     requestAnimationFrame(() => {
-      waveformView.setWaveform(audioData.waveform, audioData.duration);
+      waveformView.setWaveform(audioData.waveform, currentAudioMetadata);
       hideLoading();
     });
 
@@ -269,67 +284,41 @@ async function handleFile(file) {
 }
 
 // 更新音频信息显示
-function updateAudioInfo(file, audioData) {
+function updateAudioInfo(metadata) {
   const audioInfo = document.getElementById('audioInfo');
+  if (!audioInfo || !metadata) return;
+
+  const { fileMetadata, audioParams } = metadata;
+
   audioInfo.innerHTML = `
     <div class="info-item">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
       </svg>
-      <span>${file.name}</span>
+      <span>${fileMetadata.name}</span>
     </div>
     <div class="info-item">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M2 20h20M4 4h16v16H4z"/>
         <path d="M8 8h8v8H8z"/>
       </svg>
-      <span>${formatFileSize(file.size)}</span>
+      <span>${formatFileSize(fileMetadata.size)}</span>
     </div>
     <div class="info-item">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/>
         <path d="M12 6v6l4 2"/>
       </svg>
-      <span>${formatDuration(audioData.duration)}</span>
+      <span>${formatDuration(audioParams.duration)}</span>
     </div>
     <div class="info-item">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M23 12l-2.44-2.79.34-3.69-3.61-.82-1.89-3.2L12 2.96 8.6 1.5 6.71 4.69 3.1 5.5l.34 3.7L1 12l2.44 2.79-.34 3.7 3.61.82L8.6 22.5l3.4-1.47 3.4 1.46 1.89-3.19 3.61-.82-.34-3.69L23 12z"/>
         <path d="M12 8v4M12 16h.01"/>
       </svg>
-      <span>${formatSampleRate(audioData.sampleRate)}</span>
+      <span>${formatSampleRate(audioParams.sampleRate)}</span>
     </div>
   `;
-}
-
-// 格式化时间显示
-function formatDuration(seconds) {
-  // 处理小于0的情况
-  if (seconds < 0) seconds = 0;
-
-  // 计算时、分、秒、毫秒
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  const ms = Math.floor((seconds % 1) * 100);  // 取两位毫秒
-
-  // 格式化为两位数
-  const pad = (num) => String(num).padStart(2, '0');
-
-  // 返回完整格式
-  return `${pad(hours)}:${pad(minutes)}:${pad(secs)}:${pad(ms)}`;
-}
-
-// 格式化文件大小显示
-function formatFileSize(bytes) {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-}
-
-// 格式化采样率显示
-function formatSampleRate(sampleRate) {
-  return `${(sampleRate / 1000).toFixed(1)} kHz`;
 }
 
 // 绑定打开文件按钮事件
@@ -729,10 +718,21 @@ function updatePlaybackTime(currentTime) {
 
 // 更新总时长显示
 function updateTotalTime(duration) {
-  totalTimeDisplay.textContent = formatDuration(duration);
+  if (totalTimeDisplay) {
+    totalTimeDisplay.textContent = formatDuration(duration);
+  }
 }
 
 // 在音频加载完成后更新总时长
 audioPlayer.onLoad = (duration) => {
   updateTotalTime(duration);
 };
+
+// 在音频加载完成后启用导出按钮
+function enableButtons() {
+  exportBtn.disabled = false;
+  startMarkBtn.disabled = false;
+  endMarkBtn.disabled = false;
+  clearMarksBtn.disabled = false;
+  autoMarkBtn.disabled = false;
+}
