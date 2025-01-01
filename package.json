@@ -5,8 +5,9 @@
   "main": "src/main/index.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --debug",
-    "watch": "nodemon --watch src/main --exec electron ."
+    "dev:main": "nodemon --watch src/main --exec electron .",
+    "dev:renderer": "electron . --dev",
+    "dev:all": "concurrently \"npm run dev:main\" \"npm run dev:renderer\""
   },
   "dependencies": {
     "@electron/remote": "^2.0.10",
@@ -17,6 +18,8 @@
   },
   "devDependencies": {
     "chokidar": "^4.0.3",
-    "nodemon": "^2.0.22"
+    "concurrently": "^8.2.2",
+    "electron-reloader": "^1.2.3",
+    "nodemon": "^3.1.9"
   }
 }

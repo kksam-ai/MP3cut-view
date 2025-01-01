@@ -102,3 +102,10 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
+
+try {
+  require('electron-reloader')(module, {
+    debug: true,
+    watchRenderer: true
+  });
+} catch (_) { console.log('Error'); }
