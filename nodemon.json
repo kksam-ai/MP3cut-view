@@ -1,0 +1,10 @@
+{
+  "watch": ["src/main/*", "src/renderer/*"],
+  "ignore": ["*.test.js", "*.spec.js", ".git", "node_modules"],
+  "exec": "electron .",
+  "ext": "js,html,css",
+  "delay": "1000",
+  "env": {
+    "NODE_ENV": "development"
+  }
+}

@@ -2,7 +2,6 @@ const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const audioProcessor = require('./audio-processor')
-const chokidar = require('chokidar')
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -20,39 +19,6 @@ function createWindow() {
   // 获取渲染进程文件的绝对路径
   const rendererPath = path.join(__dirname, '../renderer')
   console.log('Watching directory:', rendererPath)
-
-  // 监听文件变化
-  const watcher = chokidar.watch(rendererPath, {
-    ignored: /(^|[\/\\])\../, // 忽略隐藏文件
-    persistent: true,
-    ignoreInitial: true,
-    awaitWriteFinish: {
-      stabilityThreshold: 100,
-      pollInterval: 100
-    }
-  });
-
-  // 添加日志记录
-  watcher
-    .on('ready', () => console.log('Initial scan complete. Ready for changes...'))
-    .on('change', filePath => {
-      console.log('File changed:', filePath)
-      // 添加小延迟确保文件写入完成
-      setTimeout(() => {
-        try {
-          win.webContents.reload()
-          console.log('Page reloaded successfully')
-        } catch (error) {
-          console.error('Error reloading page:', error)
-        }
-      }, 100)
-    })
-    .on('error', error => console.error('Watcher error:', error));
-
-  // 当窗口关闭时停止监听
-  win.on('closed', () => {
-    watcher.close()
-  })
 }
 
 // 处理音频文件
@@ -104,8 +70,16 @@ app.on('window-all-closed', () => {
 })
 
 try {
-  require('electron-reloader')(module, {
-    debug: true,
-    watchRenderer: true
-  });
-} catch (_) { console.log('Error'); }
+  if (process.env.NODE_ENV === 'development') {
+    require('electron-reloader')(module, {
+      debug: true,
+      watchRenderer: true,
+      ignore: [
+        'node_modules/**/*',
+        '.git/**/*'
+      ]
+    });
+  }
+} catch (_) {
+  console.log('Error loading electron-reloader');
+}
