@@ -2,11 +2,40 @@
  * 音频元数据管理模块
  */
 
+/**
+ * 音频元数据错误类
+ */
+class AudioMetadataError extends Error {
+  constructor(type, message, details = null) {
+    super(message);
+    this.name = 'AudioMetadataError';
+    this.type = type;
+    this.details = details;
+  }
+}
+
 // 元数据错误类型
 const MetadataError = {
-  INVALID_FILE: 'invalid_file',
-  MISSING_DATA: 'missing_data',
-  PARSE_ERROR: 'parse_error'
+  INVALID_FILE: {
+    code: 'invalid_file',
+    message: '无效的文件对象'
+  },
+  MISSING_DATA: {
+    code: 'missing_data',
+    message: '缺少必要的音频数据'
+  },
+  INVALID_FORMAT: {
+    code: 'invalid_format',
+    message: '不支持的文件格式'
+  },
+  PARSE_ERROR: {
+    code: 'parse_error',
+    message: '音频解析失败'
+  },
+  VALIDATION_ERROR: {
+    code: 'validation_error',
+    message: '数据验证失败'
+  }
 };
 
 /**
@@ -17,53 +46,77 @@ const MetadataError = {
  * @throws {Error} 如果参数无效或数据缺失
  */
 function createAudioMetadata(file, audioData) {
-  // 验证参数
-  if (!file || !(file instanceof File)) {
-    throw new Error('Invalid file object');
+  try {
+    // 验证文件对象
+    const fileValidation = validateFile(file);
+    if (!fileValidation.isValid) {
+      throw new AudioMetadataError(
+        MetadataError.VALIDATION_ERROR.code,
+        MetadataError.VALIDATION_ERROR.message,
+        fileValidation.errors
+      );
+    }
+
+    // 验证音频数据
+    const audioValidation = validateAudioData(audioData);
+    if (!audioValidation.isValid) {
+      throw new AudioMetadataError(
+        MetadataError.VALIDATION_ERROR.code,
+        MetadataError.VALIDATION_ERROR.message,
+        audioValidation.errors
+      );
+    }
+
+    // 提取文件信息
+    const fileMetadata = {
+      name: file.name,                      // 文件名
+      path: file.path,                      // 完整路径
+      directory: getDirectory(file.path),    // 目录路径
+      size: file.size,                      // 文件大小
+      type: file.type,                      // MIME类型
+      extension: getExtension(file.name),    // 扩展名
+      lastModified: new Date(file.lastModified) // 修改时间
+    };
+
+    // 提取音频参数
+    const audioParams = {
+      sampleRate: audioData.sampleRate || 0,
+      bitRate: audioData.bitRate || 0,
+      channels: audioData.channels || 0,
+      codec: audioData.codec || '',
+      duration: audioData.duration || 0,
+      format: audioData.format || ''
+    };
+
+    // 提取标签信息(如果有)
+    const tags = {
+      title: audioData.tags?.title || '',
+      artist: audioData.tags?.artist || '',
+      album: audioData.tags?.album || '',
+      year: audioData.tags?.year || ''
+    };
+
+    // 创建元数据对象
+    const metadata = {
+      fileMetadata: Object.freeze(fileMetadata),
+      audioParams: Object.freeze(audioParams),
+      tags: Object.freeze(tags)
+    };
+
+    // 返回不可变对象
+    return Object.freeze(metadata);
+  } catch (error) {
+    // 如果已经是 AudioMetadataError 则直接抛出
+    if (error instanceof AudioMetadataError) {
+      throw error;
+    }
+    // 其他错误包装为 AudioMetadataError
+    throw new AudioMetadataError(
+      MetadataError.PARSE_ERROR.code,
+      MetadataError.PARSE_ERROR.message,
+      error.message
+    );
   }
-
-  if (!audioData) {
-    throw new Error('Missing audio data');
-  }
-
-  // 提取文件信息
-  const fileMetadata = {
-    name: file.name,                      // 文件名
-    path: file.path,                      // 完整路径
-    directory: getDirectory(file.path),    // 目录路径
-    size: file.size,                      // 文件大小
-    type: file.type,                      // MIME类型
-    extension: getExtension(file.name),    // 扩展名
-    lastModified: new Date(file.lastModified) // 修改时间
-  };
-
-  // 提取音频参数
-  const audioParams = {
-    sampleRate: audioData.sampleRate || 0,
-    bitRate: audioData.bitRate || 0,
-    channels: audioData.channels || 0,
-    codec: audioData.codec || '',
-    duration: audioData.duration || 0,
-    format: audioData.format || ''
-  };
-
-  // 提取标签信息(如果有)
-  const tags = {
-    title: audioData.tags?.title || '',
-    artist: audioData.tags?.artist || '',
-    album: audioData.tags?.album || '',
-    year: audioData.tags?.year || ''
-  };
-
-  // 创建元数据对象
-  const metadata = {
-    fileMetadata: Object.freeze(fileMetadata),
-    audioParams: Object.freeze(audioParams),
-    tags: Object.freeze(tags)
-  };
-
-  // 返回不可变对象
-  return Object.freeze(metadata);
 }
 
 /**
@@ -109,11 +162,98 @@ function formatSampleRate(sampleRate) {
   return `${(sampleRate / 1000).toFixed(1)} kHz`;
 }
 
+/**
+ * 验证音频参数
+ * @param {Object} audioData - 音频数据对象
+ * @returns {Object} 验证结果 {isValid, errors}
+ */
+function validateAudioData(audioData) {
+  const errors = [];
+
+  // 检查必需字段
+  const requiredFields = ['sampleRate', 'duration', 'numberOfChannels', 'waveform'];
+  requiredFields.forEach(field => {
+    if (audioData[field] === undefined) {
+      errors.push(`Missing required field: ${field}`);
+    }
+  });
+
+  // 验证数值字段
+  if (audioData.sampleRate <= 0) {
+    errors.push('Invalid sample rate');
+  }
+  if (audioData.duration <= 0) {
+    errors.push('Invalid duration');
+  }
+  if (audioData.numberOfChannels <= 0) {
+    errors.push('Invalid number of channels');
+  }
+  if (!audioData.waveform || audioData.waveform.length === 0) {
+    errors.push('Invalid waveform data');
+  }
+
+  // 验证可选字段的类型
+  if (audioData.bitRate && typeof audioData.bitRate !== 'number') {
+    errors.push('Invalid bitRate type');
+  }
+  if (audioData.format && typeof audioData.format !== 'string') {
+    errors.push('Invalid format type');
+  }
+  if (audioData.codec && typeof audioData.codec !== 'string') {
+    errors.push('Invalid codec type');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * 验证文件对象
+ * @param {File} file - 文件对象
+ * @returns {Object} 验证结果 {isValid, errors}
+ */
+function validateFile(file) {
+  const errors = [];
+
+  // 检查文件对象
+  if (!file || !(file instanceof File)) {
+    errors.push('Invalid file object');
+    return { isValid: false, errors };
+  }
+
+  // 检查文件属性
+  if (!file.name) {
+    errors.push('Missing file name');
+  }
+  if (!file.size || file.size <= 0) {
+    errors.push('Invalid file size');
+  }
+  if (!file.type) {
+    errors.push('Missing file type');
+  }
+
+  // 检查文件扩展名
+  const extension = getExtension(file.name);
+  if (!extension) {
+    errors.push('Missing file extension');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
 // 导出模块接口
 module.exports = {
+  AudioMetadataError,
   MetadataError,
   createAudioMetadata,
   formatFileSize,
   formatDuration,
-  formatSampleRate
+  formatSampleRate,
+  validateAudioData,
+  validateFile
 };

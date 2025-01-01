@@ -19,7 +19,9 @@ const {
   createAudioMetadata,
   formatFileSize,
   formatDuration,
-  formatSampleRate
+  formatSampleRate,
+  AudioMetadataError,
+  MetadataError
 } = require('./audio-metadata.js');
 
 // 获取播放状态栏元素
@@ -108,27 +110,56 @@ function hideLoading() {
 
 // 处理音频数据
 async function processAudioData(arrayBuffer) {
-  // 加载音频并获取音频信息
-  const audioInfo = await audioPlayer.loadAudio(arrayBuffer);
+  try {
+    // 加载音频并获取音频信息
+    const audioInfo = await audioPlayer.loadAudio(arrayBuffer);
 
-  // 使用 AudioBuffer 的准确时长
-  const duration = audioInfo.audioBuffer.duration;
+    // 使用 AudioBuffer 的准确时长
+    const duration = audioInfo.audioBuffer.duration;
 
-  // 更新总时长显示
-  updateTotalTime(duration);
+    // 更新总时长显示
+    updateTotalTime(duration);
 
-  // 使用音频缓冲区数据计算波形
-  const waveformData = computeWaveform(audioPlayer.getWaveformData(), duration);
+    // 使用音频缓冲区数据计算波形
+    const waveformData = computeWaveform(audioPlayer.getWaveformData(), duration);
 
-  return {
-    sampleRate: audioInfo.sampleRate,
-    duration: duration,
-    numberOfChannels: audioInfo.numberOfChannels,
-    waveform: waveformData.data,
-    // 添加其他可能需要的音频参数
-    format: 'wav', // 转换后的格式
-    codec: 'pcm' // 转换后的编码
-  };
+    // 构建完整的音频参数
+    return {
+      // 基本参数
+      sampleRate: audioInfo.sampleRate,
+      duration: duration,
+      numberOfChannels: audioInfo.numberOfChannels,
+
+      // 编码参数
+      bitRate: audioInfo.bitRate || 0,  // 比特率
+      format: audioInfo.format || 'wav',  // 音频格式
+      codec: audioInfo.codec || 'pcm',  // 编码格式
+
+      // 计算的波形数据
+      waveform: waveformData.data,
+
+      // 其他音频特性
+      frameSize: audioInfo.frameSize || 0,
+      frameCount: audioInfo.frameCount || 0,
+
+      // 音频状态
+      isValid: true,
+      hasError: false,
+      error: null
+    };
+  } catch (error) {
+    console.error('Error processing audio data:', error);
+    return {
+      isValid: false,
+      hasError: true,
+      error: error.message,
+      // 提供默认值
+      sampleRate: 0,
+      duration: 0,
+      numberOfChannels: 0,
+      waveform: new Float32Array(0)
+    };
+  }
 }
 
 // 计算波形数据
@@ -189,6 +220,44 @@ function computeWaveform(channelData, duration) {
 
 // 存储当前音频元数据
 let currentAudioMetadata = null;
+
+// 添加错误处理函数
+function handleError(error) {
+  console.error('Error:', error);
+
+  // 隐藏加载遮罩
+  hideLoading();
+
+  // 禁用所有按钮
+  disableButtons();
+
+  // 根据错误类型显示不同的错误信息
+  let errorMessage = '处理文件时出错';
+
+  if (error instanceof AudioMetadataError) {
+    switch (error.type) {
+      case MetadataError.INVALID_FILE.code:
+        errorMessage = '无效的文件';
+        break;
+      case MetadataError.MISSING_DATA.code:
+        errorMessage = '音频数据不完整';
+        break;
+      case MetadataError.INVALID_FORMAT.code:
+        errorMessage = '不支持的文件格式';
+        break;
+      case MetadataError.VALIDATION_ERROR.code:
+        errorMessage = '数据验证失败: ' + error.details.join(', ');
+        break;
+      default:
+        errorMessage = error.message || '未知错误';
+    }
+  } else {
+    errorMessage = error.message || '未知错误';
+  }
+
+  // 显示错误信息
+  alert(errorMessage);
+}
 
 // 处理文件
 async function handleFile(file) {
@@ -255,15 +324,7 @@ async function handleFile(file) {
     });
 
   } catch (error) {
-    console.error('Error processing file:', error);
-    hideLoading();
-
-    // 错误处理时禁用所有按钮
-    disableButtons();
-
-    // 显示具体错误信息
-    alert('处理文件时出错: ' + (error.message || '未知错误'));
-
+    handleError(error);
   } finally {
     // 确保所有处理完成后再删除临时文件
     if (tempFilePath) {
