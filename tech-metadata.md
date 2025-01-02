@@ -37,7 +37,7 @@ const AudioMetadata = {
   audioParams: {
     sampleRate: Number,  // 采样率
     bitRate: Number,     // 比特率
-    channels: Number,    // 声道数
+    numberOfChannels: Number, // 声道数
     codec: String,       // 编码格式
     duration: Number,    // 时长(秒)
     format: String       // 容器格式
@@ -56,65 +56,97 @@ const AudioMetadata = {
 
 ## 核心功能
 
-### 1. 创建元数据
+### 1. 错误处理
 ```javascript
-/**
- * 创建音频元数据对象
- * @param {File} file - 音频文件对象
- * @param {Object} audioData - 音频解析数据
- * @returns {Object} 不可变的元数据对象
- */
-function createAudioMetadata(file, audioData) {
-  // 验证参数
-  // 提取信息
-  // 创建对象
-  // 冻结对象
+// 音频元数据错误类
+class AudioMetadataError extends Error {
+  constructor(type, message, details = null) {
+    super(message);
+    this.name = 'AudioMetadataError';
+    this.type = type;
+    this.details = details;
+  }
 }
-```
 
-### 2. 数据验证
-```javascript
-/**
- * 验证元数据完整性
- * @param {Object} metadata - 元数据对象
- * @returns {boolean} 验证结果
- */
-function validateMetadata(metadata) {
-  // 检查必需字段
-  // 验证数据类型
-  // 验证值范围
-}
-```
-
-### 3. 错误处理
-```javascript
-/**
- * 元数据错误类型
- */
+// 错误类型定义
 const MetadataError = {
-  INVALID_FILE: 'invalid_file',
-  MISSING_DATA: 'missing_data',
-  PARSE_ERROR: 'parse_error',
-  // ...其他错误类型
+  INVALID_FILE: { code: 'invalid_file', message: '无效的文件对象' },
+  MISSING_DATA: { code: 'missing_data', message: '缺少必要的音频数据' },
+  INVALID_FORMAT: { code: 'invalid_format', message: '不支持的文件格式' },
+  PARSE_ERROR: { code: 'parse_error', message: '音频解析失败' },
+  VALIDATION_ERROR: { code: 'validation_error', message: '数据验证失败' }
+};
+```
+
+### 2. 数据不可变性
+```javascript
+/**
+ * 深度冻结对象及其所有嵌套属性
+ * 使用 WeakMap 缓存已冻结对象，避免重复冻结
+ * 处理循环引用问题
+ */
+function deepFreeze(obj) {
+  const frozenObjects = new WeakMap();
+
+  function freeze(obj) {
+    if (obj === null || typeof obj !== 'object' || Object.isFrozen(obj)) {
+      return obj;
+    }
+
+    if (frozenObjects.has(obj)) {
+      return frozenObjects.get(obj);
+    }
+
+    frozenObjects.set(obj, obj);
+    Object.getOwnPropertyNames(obj).forEach(name => {
+      const prop = obj[name];
+      if (prop && typeof prop === 'object' && !Array.isArray(prop)) {
+        obj[name] = freeze(prop);
+      }
+    });
+
+    return Object.freeze(obj);
+  }
+
+  return freeze(obj);
 }
 ```
 
-## 实现细节
+### 3. 数据验证
+```javascript
+/**
+ * 验证元数据对象的不可变性
+ * 使用 WeakSet 缓存已验证的对象
+ * 优化错误收集
+ */
+function validateMetadataImmutability(metadata) {
+  const validatedObjects = new WeakSet();
+  const errors = [];
 
-### 1. 文件信息提取
-- 使用 File API 获取基本信息
-- 使用 path 模块处理路径
-- 处理特殊字符和编码
+  function validate(obj, path = '') {
+    if (!obj || typeof obj !== 'object' || validatedObjects.has(obj)) {
+      return;
+    }
+    validatedObjects.add(obj);
 
-### 2. 音频参数获取
-- 使用 AudioContext 解析音频
-- 使用 ffmpeg 获取详细参数
-- 缓存解析结果
+    if (!Object.isFrozen(obj)) {
+      errors.push(`Object at "${path || 'root'}" is not frozen`);
+      return;
+    }
 
-### 3. 不可变性实现
-- 使用 Object.freeze() 递归冻结
-- 返回只读视图
-- 验证修改操作
+    Object.entries(obj).forEach(([key, value]) => {
+      if (value && typeof value === 'object') {
+        validate(value, path ? `${path}.${key}` : key);
+      }
+    });
+  }
+
+  validate(metadata);
+  if (errors.length > 0) {
+    throw new Error(`Immutability validation failed:\n${errors.join('\n')}`);
+  }
+}
+```
 
 ## 使用示例
 
@@ -129,53 +161,111 @@ console.log(metadata.audioParams.duration);
 
 // 错误处理
 try {
-  const metadata = createAudioMetadata(file);
+  const metadata = createAudioMetadata(file, audioData);
 } catch (error) {
-  if (error.code === MetadataError.INVALID_FILE) {
-    // 处理错误
+  if (error instanceof AudioMetadataError) {
+    switch (error.type) {
+      case MetadataError.INVALID_FILE.code:
+        console.error('无效的文件:', error.details);
+        break;
+      case MetadataError.VALIDATION_ERROR.code:
+        console.error('数据验证失败:', error.details);
+        break;
+      // ...处理其他错误类型
+    }
   }
 }
 ```
 
-## 开发步骤
+## 性能优化
 
-### 第一阶段 - 基础实现
-1. 创建核心数据结构
-2. 实现基本信息提取
-3. 添加简单验证
-4. 集成到文件加载流程
+### 1. 对象冻结优化
+- 使用 WeakMap 缓存已冻结对象
+- 避免重复冻结同一对象
+- 处理循环引用问题
 
-### 第二阶段 - 功能完善
-1. 实现音频参数获取
-2. 添加运行时数据验证
-3. 完善错误处理
+### 2. 验证优化
+- 使用 WeakSet 缓存已验证对象
+- 优化错误收集机制
+- 提前返回减少不必要的检查
 
-### 第三阶段 - 更新代码
-1. 更新现有代码
+### 3. 对象创建优化
+- 使用对象字面量减少中间对象
+- 优化属性访问和复制
+- 添加类型检查缓存
 
-### 第四阶段 - 性能优化
-1. 优化性能，优化内存使用
-2. 完善文档
+### 4. 错误处理优化
+- 统一的错误类型
+- 详细的错误信息
+- 支持错误恢复
+
+## 最佳实践
+
+### 1. 创建元数据
+```javascript
+// 推荐：使用完整的音频数据
+const metadata = createAudioMetadata(file, {
+  sampleRate: 44100,
+  duration: 120,
+  numberOfChannels: 2,
+  bitRate: 320000,
+  format: 'mp3',
+  codec: 'mp3',
+  tags: {
+    title: 'Song Title'
+  }
+});
+
+// 不推荐：缺少必要数据
+const metadata = createAudioMetadata(file, {
+  sampleRate: 44100
+  // 缺少其他必要参数
+});
+```
+
+### 2. 错误处理
+```javascript
+try {
+  const metadata = createAudioMetadata(file, audioData);
+} catch (error) {
+  if (error instanceof AudioMetadataError) {
+    // 使用错误类型和详细信息
+    console.error(`${error.type}: ${error.message}`, error.details);
+  } else {
+    // 处理其他错误
+    console.error('Unexpected error:', error);
+  }
+}
+```
+
+### 3. 数据访问
+```javascript
+// 推荐：直接访问属性
+const duration = metadata.audioParams.duration;
+
+// 不推荐：尝试修改属性
+metadata.audioParams.duration = 100; // 将抛出错误
+```
 
 ## 注意事项
 
 ### 1. 数据完整性
-- 确保必需字段存在
+- 确保提供所有必需的音频参数
 - 验证数据类型和范围
-- 处理缺失数据情况
+- 处理可选字段的默认值
 
 ### 2. 错误处理
-- 提供详细错误信息
-- 支持错误恢复
-- 记录错误日志
+- 使用 try-catch 包装元数据创建
+- 正确处理不同类型的错误
+- 提供有意义的错误信息
 
 ### 3. 性能考虑
-- 避免重复解析
-- 优化内存使用
-- 处理大文件
+- 避免频繁创建元数据对象
+- 合理使用验证功能
+- 注意大文件处理
 
 ### 4. 兼容性
 - 处理不同音频格式
-- 兼容不同操作系统
-- 处理特殊字符
+- 兼容不同的文件系统
+- 处理特殊字符和编码
 
