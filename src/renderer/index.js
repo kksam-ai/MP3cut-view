@@ -114,20 +114,14 @@ async function processAudioData(arrayBuffer) {
     // 加载音频并获取音频信息
     const audioInfo = await audioPlayer.loadAudio(arrayBuffer);
 
-    // 使用 AudioBuffer 的准确时长
-    const duration = audioInfo.audioBuffer.duration;
-
-    // 更新总时长显示
-    updateTotalTime(duration);
-
     // 使用音频缓冲区数据计算波形
-    const waveformData = computeWaveform(audioPlayer.getWaveformData(), duration);
+    const waveformData = computeWaveform(audioPlayer.getWaveformData(), audioInfo.audioBuffer.duration);
 
     // 构建完整的音频参数
     return {
       // 基本参数
       sampleRate: audioInfo.sampleRate,
-      duration: duration,
+      duration: audioInfo.audioBuffer.duration,
       numberOfChannels: audioInfo.numberOfChannels,
 
       // 编码参数
@@ -135,7 +129,7 @@ async function processAudioData(arrayBuffer) {
       format: audioInfo.format || 'wav',  // 音频格式
       codec: audioInfo.codec || 'pcm',  // 编码格式
 
-      // 计算的波形数据
+      // 波形数据
       waveform: waveformData.data,
 
       // 其他音频特性
@@ -149,16 +143,11 @@ async function processAudioData(arrayBuffer) {
     };
   } catch (error) {
     console.error('Error processing audio data:', error);
-    return {
-      isValid: false,
-      hasError: true,
-      error: error.message,
-      // 提供默认值
-      sampleRate: 0,
-      duration: 0,
-      numberOfChannels: 0,
-      waveform: new Float32Array(0)
-    };
+    throw new AudioMetadataError(
+      MetadataError.PARSE_ERROR.code,
+      MetadataError.PARSE_ERROR.message,
+      error.message
+    );
   }
 }
 

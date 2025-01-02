@@ -423,8 +423,7 @@ class WaveformView {
 
     const layout = this.calculateLayout();
 
-    // 计算当前播放位置对应的波形索引
-    // 使用音频总时长和波形总条数建立映射
+    // 使用元数据中的时长
     const progress = this.playbackPosition / this.audioDuration;
     const totalBars = this.processedData.length;
     const currentBar = Math.floor(progress * totalBars);
@@ -619,6 +618,7 @@ class WaveformView {
 
   // 添加时间转换为波形条索引的方法
   timeToBarIndex(time) {
+    // 使用元数据中的时长
     const progress = time / this.audioDuration;
     return Math.floor(progress * this.processedData.length);
   }
