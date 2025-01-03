@@ -21,7 +21,8 @@ const {
   formatDuration,
   formatSampleRate,
   AudioMetadataError,
-  MetadataError
+  MetadataError,
+  formatDisplayTime
 } = require('./audio-metadata.js');
 
 // 获取播放状态栏元素
@@ -116,6 +117,11 @@ async function processAudioData(arrayBuffer) {
 
     // 使用音频缓冲区数据计算波形
     const waveformData = computeWaveform(audioPlayer.getWaveformData(), audioInfo.audioBuffer.duration);
+
+    // 在这里应该触发 onLoad 事件
+    if (audioPlayer.onLoad) {
+      audioPlayer.onLoad(audioInfo.audioBuffer.duration);
+    }
 
     // 构建完整的音频参数
     return {
@@ -359,7 +365,7 @@ function updateAudioInfo(metadata) {
         <circle cx="12" cy="12" r="10"/>
         <path d="M12 6v6l4 2"/>
       </svg>
-      <span>${formatDuration(audioParams.duration)}</span>
+      <span>${formatDisplayTime(audioParams.duration)}</span>
     </div>
     <div class="info-item">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -557,7 +563,7 @@ function updateMarkList() {
 
   markList.innerHTML = marks.map(mark => {
     const isPaired = mark.pairedId !== null;
-    const time = formatDuration(mark.time);
+    const time = formatDisplayTime(mark.time);
     const type = mark.type === 'start' ? '开始' : '结束';
     const typeClass = mark.type === 'start' ? 'mark-start' : 'mark-end';
     const statusClass = isPaired ? 'mark-paired' : 'mark-unpaired';
@@ -762,14 +768,14 @@ autoMarkBtn.addEventListener('click', () => {
 // 更新播放时间显示
 function updatePlaybackTime(currentTime) {
   if (currentTimeDisplay) {
-    currentTimeDisplay.textContent = formatDuration(currentTime);
+    currentTimeDisplay.textContent = formatDisplayTime(currentTime);
   }
 }
 
 // 更新总时长显示
 function updateTotalTime(duration) {
   if (totalTimeDisplay) {
-    totalTimeDisplay.textContent = formatDuration(duration);
+    totalTimeDisplay.textContent = formatDisplayTime(duration);
   }
 }
 

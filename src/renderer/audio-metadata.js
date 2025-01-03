@@ -306,14 +306,55 @@ function validateFile(file) {
   };
 }
 
+/**
+ * 将秒数转换为完整的时间格式字符串 (hh:mm:ss:ms)
+ * @param {number} seconds - 秒数
+ * @returns {string} 格式化的时间字符串
+ */
+function formatTime(seconds) {
+  if (seconds < 0) seconds = 0;
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 100);
+  const pad = (num) => String(num).padStart(2, '0');
+
+  return `${pad(hours)}:${pad(minutes)}:${pad(secs)}:${pad(ms)}`;
+}
+
+/**
+ * 将时间字符串解析为秒数
+ * @param {string} timeStr - 格式化的时间字符串 (hh:mm:ss:ms)
+ * @returns {number} 秒数
+ */
+function parseTime(timeStr) {
+  const [hours, minutes, seconds, ms] = timeStr.split(':').map(Number);
+  return hours * 3600 + minutes * 60 + seconds + ms / 100;
+}
+
+/**
+ * 根据音频时长显示适当的时间格式
+ * 如果时长小于1小时，则不显示小时部分
+ * @param {number} seconds - 秒数
+ * @returns {string} 格式化的时间字符串
+ */
+function formatDisplayTime(seconds) {
+  const timeStr = formatTime(seconds);
+  const [hours, ...rest] = timeStr.split(':');
+  return hours === '00' ? rest.join(':') : timeStr;
+}
+
 // 导出模块接口
 module.exports = {
   AudioMetadataError,
   MetadataError,
   createAudioMetadata,
   formatFileSize,
-  formatDuration,
+  formatDuration: formatTime,
   formatSampleRate,
   validateAudioData,
-  validateFile
+  validateFile,
+  formatTime,
+  parseTime,
+  formatDisplayTime
 };
