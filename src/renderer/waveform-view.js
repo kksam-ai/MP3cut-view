@@ -735,6 +735,14 @@ class WaveformView {
   getWaveformData() {
     return this.processedData;
   }
+
+  // 修改设置波形数据的方法，接收时长参数
+  setWaveformData(data, duration) {
+    this.waveformData = data;
+    this.audioDuration = duration;
+    this.processedData = this.processWaveform(data);
+    this.draw();
+  }
 }
 
 module.exports = WaveformView;

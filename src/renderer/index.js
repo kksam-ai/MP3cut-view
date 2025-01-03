@@ -110,13 +110,24 @@ function hideLoading() {
 }
 
 // 处理音频数据
-async function processAudioData(arrayBuffer) {
+async function processAudioData(arrayBuffer, file) {
   try {
     // 加载音频并获取音频信息
     const audioInfo = await audioPlayer.loadAudio(arrayBuffer);
 
-    // 使用音频缓冲区数据计算波形
-    const waveformData = computeWaveform(audioPlayer.getWaveformData(), audioInfo.audioBuffer.duration);
+    // 构建音频元数据
+    const metadata = createAudioMetadata(file, {
+      sampleRate: audioInfo.audioBuffer.sampleRate,
+      duration: audioInfo.audioBuffer.duration,
+      numberOfChannels: audioInfo.audioBuffer.numberOfChannels,
+      waveform: audioPlayer.getWaveformData()
+    });
+
+    // 使用元数据中的时长来计算波形
+    const waveformData = computeWaveform(audioPlayer.getWaveformData(), metadata.audioParams.duration);
+
+    // 设置波形数据和时长
+    waveformView.setWaveformData(waveformData, metadata.audioParams.duration);
 
     // 在这里应该触发 onLoad 事件
     if (audioPlayer.onLoad) {
@@ -276,28 +287,34 @@ async function handleFile(file) {
   markManager.clear();
   updateMarkList();
 
-  // 检查文件格式
-  const extension = file.name.toLowerCase().match(/\.[^.]*$/)?.[0];
-  if (!extension || !SUPPORTED_FORMATS.includes(extension)) {
-    hideLoading();
-    alert('不支持的文件格式!');
-    return;
-  }
-
   try {
+    // 检查文件格式
+    const extension = file.name.toLowerCase().match(/\.[^.]*$/)?.[0];
+    if (!extension || !SUPPORTED_FORMATS.includes(extension)) {
+      hideLoading();
+      alert('不支持的文件格式!');
+      return;
+    }
+
     // 发送文件到主进程处理
     const result = await ipcRenderer.invoke('process-audio-file', file.path);
     if (!result.success) {
-      throw new Error(result.error || '处理文件失败');
+      throw new Error(result.error);
     }
 
+    // 保存临时文件路径
     tempFilePath = result.path;
 
-    // 读取转换后的 WAV 文件
-    const wavData = await fs.promises.readFile(tempFilePath);
+    // 读取处理后的文件
+    const fileBuffer = await fs.promises.readFile(tempFilePath);
+    // 转换为 ArrayBuffer
+    const arrayBuffer = fileBuffer.buffer.slice(
+      fileBuffer.byteOffset,
+      fileBuffer.byteOffset + fileBuffer.byteLength
+    );
 
     // 处理音频数据
-    const audioData = await processAudioData(wavData.buffer);
+    const audioData = await processAudioData(arrayBuffer, file);
 
     // 创建音频元数据
     currentAudioMetadata = createAudioMetadata(file, audioData);
@@ -321,21 +338,15 @@ async function handleFile(file) {
   } catch (error) {
     handleError(error);
   } finally {
-    // 确保所有处理完成后再删除临时文件
+    // 清理临时文件
     if (tempFilePath) {
       try {
-        // 添加小延迟确保文件不在使用中
-        setTimeout(async () => {
-          try {
-            await fs.promises.unlink(tempFilePath);
-          } catch (unlinkError) {
-            console.error('Error deleting temp file:', unlinkError);
-          }
-        }, 1000);
-      } catch (unlinkError) {
-        console.error('Error deleting temp file:', unlinkError);
+        await fs.promises.unlink(tempFilePath);
+      } catch (error) {
+        console.error('Error cleaning up temp file:', error);
       }
     }
+    hideLoading();
   }
 }
 
