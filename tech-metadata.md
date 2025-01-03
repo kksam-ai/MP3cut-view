@@ -148,6 +148,27 @@ function validateMetadataImmutability(metadata) {
 }
 ```
 
+### 4. 时间格式化
+```javascript
+// 统一的时间格式化接口
+function formatTime(seconds) {
+  // 完整格式 hh:mm:ss:ms
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}:${pad(ms)}`;
+}
+
+function formatDisplayTime(seconds) {
+  // 根据时长智能显示格式
+  // 小于1小时时不显示小时部分
+  return hours === '00' ? rest.join(':') : timeStr;
+}
+```
+
+### 5. 数据获取
+- 音频参数从 AudioBuffer 获取原始数据
+- 元数据模块统一管理音频信息
+- 波形渲染等模块从元数据获取时长等信息
+- 保持数据的一致性和可维护性
+
 ## 使用示例
 
 ### 基本使用
