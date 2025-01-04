@@ -208,14 +208,30 @@ function formatFileSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-function formatDuration(seconds) {
+/**
+ * 将秒数转换为时间格式字符串 (HH:MM:SS:CC)
+ * @param {number} seconds - 秒数，支持小数部分
+ * @returns {string} 格式化的时间字符串，CC表示百分秒（1秒=100百分秒）
+ */
+function formatTime(seconds) {
   if (seconds < 0) seconds = 0;
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  const ms = Math.floor((seconds % 1) * 100);
+  const cs = Math.floor((seconds % 1) * 100); // 将小数部分转换为百分秒
   const pad = (num) => String(num).padStart(2, '0');
-  return `${pad(hours)}:${pad(minutes)}:${pad(secs)}:${pad(ms)}`;
+
+  return `${pad(hours)}:${pad(minutes)}:${pad(secs)}:${pad(cs)}`;
+}
+
+/**
+ * 将时间字符串解析为秒数
+ * @param {string} timeStr - 格式化的时间字符串 (HH:MM:SS:CC)
+ * @returns {number} 秒数（带小数部分）
+ */
+function parseTime(timeStr) {
+  const [hours, minutes, seconds, cs] = timeStr.split(':').map(Number);
+  return hours * 3600 + minutes * 60 + seconds + cs / 100;
 }
 
 function formatSampleRate(sampleRate) {
@@ -304,32 +320,6 @@ function validateFile(file) {
     isValid: errors.length === 0,
     errors
   };
-}
-
-/**
- * 将秒数转换为完整的时间格式字符串 (hh:mm:ss:ms)
- * @param {number} seconds - 秒数
- * @returns {string} 格式化的时间字符串
- */
-function formatTime(seconds) {
-  if (seconds < 0) seconds = 0;
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  const ms = Math.floor((seconds % 1) * 100);
-  const pad = (num) => String(num).padStart(2, '0');
-
-  return `${pad(hours)}:${pad(minutes)}:${pad(secs)}:${pad(ms)}`;
-}
-
-/**
- * 将时间字符串解析为秒数
- * @param {string} timeStr - 格式化的时间字符串 (hh:mm:ss:ms)
- * @returns {number} 秒数
- */
-function parseTime(timeStr) {
-  const [hours, minutes, seconds, ms] = timeStr.split(':').map(Number);
-  return hours * 3600 + minutes * 60 + seconds + ms / 100;
 }
 
 /**
