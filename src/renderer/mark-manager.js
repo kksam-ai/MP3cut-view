@@ -22,18 +22,34 @@ class MarkManager {
    * 添加标记
    * @param {string} type - 标记类型 ('start' | 'end')
    * @param {number} time - 标记时间点（秒），例如：1.5表示一秒半
-   * @returns {Object} 创建的标记对象
+   * @returns {Object|null} 创建的标记对象，如果是重复标记则返回null
    */
   addMark(type, time) {
-    const id = this.generateId();
-    const mark = {
-      id,
-      type,
-      time
-    };
+    // 检查是否存在完全相同时间点的同类标记
+    const existingMarks = Array.from(this.marks.values());
+    const hasDuplicate = existingMarks.some(mark =>
+      mark.type === type && mark.time === time
+    );
 
+    // 如果存在重复标记，直接返回null
+    if (hasDuplicate) {
+      return null;
+    }
+
+    // 创建新标记
+    const id = this.generateId();
+    const mark = { id, type, time };
     this.marks.set(id, mark);
     return mark;
+  }
+
+  /**
+   * 删除标记
+   * @param {string} id - 标记ID
+   * @returns {boolean} 删除是否成功
+   */
+  removeMark(id) {
+    return this.marks.delete(id);
   }
 
   /**
