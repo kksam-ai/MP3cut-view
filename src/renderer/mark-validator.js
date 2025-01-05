@@ -19,17 +19,22 @@
  * @returns {ValidSegment[]} 有效片段列表
  */
 function getValidSegments(marks, audioDuration) {
+  console.log('开始验证片段:', { marks, audioDuration });
+
   // 参数验证
   if (!Array.isArray(marks) || marks.length === 0) {
+    console.log('标记列表为空或无效');
     return [];
   }
 
   if (typeof audioDuration !== 'number' || audioDuration <= 0) {
+    console.log('音频时长无效:', audioDuration);
     return [];
   }
 
   // 按时间排序
   const sortedMarks = marks.sort((a, b) => a.time - b.time);
+  console.log('排序后的标记:', sortedMarks);
 
   // 查找有效片段
   const segments = [];
@@ -41,6 +46,7 @@ function getValidSegments(marks, audioDuration) {
 
     // 验证时间范围
     if (current.time < 0 || next.time > audioDuration) {
+      console.log('标记超出范围:', { current, next, audioDuration });
       continue;
     }
 
@@ -50,6 +56,7 @@ function getValidSegments(marks, audioDuration) {
 
       // 验证时间间隔
       if (duration >= 1) {
+        console.log('找到有效片段:', { start: current, end: next, duration });
         segments.push({
           startTime: current.time,
           endTime: next.time,
@@ -59,10 +66,15 @@ function getValidSegments(marks, audioDuration) {
 
         // 跳过已使用的结束标记
         i++;
+      } else {
+        console.log('片段时长不足1秒:', duration);
       }
+    } else {
+      console.log('非有效的开始-结束对:', { current, next });
     }
   }
 
+  console.log('验证完成,有效片段数:', segments.length);
   return segments;
 }
 

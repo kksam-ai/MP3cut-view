@@ -24,6 +24,9 @@ const {
   MetadataError,
   formatDisplayTime
 } = require('./audio-metadata.js');
+const ExportDialog = require('./export-dialog');
+const { formatTime } = require('./mark-validator');
+const { getValidSegments } = require('./mark-validator');
 
 // 获取播放状态栏元素
 const currentTimeDisplay = document.querySelector('.current-time');
@@ -803,3 +806,38 @@ function enableButtons() {
   clearMarksBtn.disabled = false;
   autoMarkBtn.disabled = false;
 }
+
+// 创建导出对话框实例
+const exportDialog = new ExportDialog();
+
+// 添加导出按钮事件处理
+document.getElementById('exportBtn').addEventListener('click', () => {
+  // 检查是否有音频数据
+  if (!currentAudioMetadata) {
+    console.warn('No audio loaded');
+    return;
+  }
+
+  // 添加详细日志
+  console.log('完整的元数据:', currentAudioMetadata);
+  console.log('音频参数:', currentAudioMetadata.audioParams);
+  console.log('正确的时长:', currentAudioMetadata.audioParams.duration);
+
+  // 获取标记数据
+  const marks = markManager.getAllMarks();
+  console.log('标记数据:', marks);
+  console.log('音频时长:', currentAudioMetadata.audioParams.duration);
+
+  // 获取有效片段
+  const segments = getValidSegments(marks, currentAudioMetadata.audioParams.duration);
+  console.log('验证后的片段:', segments);
+
+  // 检查是否有有效片段
+  if (segments.length === 0) {
+    alert('没有找到有效的音频片段，请先添加标记');
+    return;
+  }
+
+  // 显示导出对话框
+  exportDialog.show(segments);
+});
