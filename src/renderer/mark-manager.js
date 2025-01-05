@@ -48,7 +48,6 @@ class MarkManager {
 
     // 检查是否与现有标记冲突
     if (this.hasTimeConflict(normalizedTime, type, null)) {
-      alert('当前时间点已存在同类标记，无法创建新标记。');
       return null;
     }
 
