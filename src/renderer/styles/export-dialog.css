@@ -38,6 +38,8 @@
   padding: 20px;
   overflow-y: auto;
   flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .export-file-list {
@@ -76,6 +78,7 @@
   border-radius: 4px;
   border: none;
   cursor: pointer;
+  min-width: 80px;
 }
 
 .export-dialog button.primary {
@@ -83,9 +86,17 @@
   color: white;
 }
 
+.export-dialog button.primary:hover {
+  background: #0056b3;
+}
+
 .export-dialog button.secondary {
   background: #e9ecef;
   color: #333;
+}
+
+.export-dialog button.secondary:hover {
+  background: #dde2e6;
 }
 
 /* 状态样式 */
@@ -95,7 +106,7 @@
 
 /* 动画效果 */
 .export-dialog {
-  transition: transform 0.2s ease-out;
+  transition: all 0.2s ease-out;
   transform: translateY(0);
 }
 
@@ -103,16 +114,34 @@
   transform: translateY(-20px);
 }
 
-/* 导出状态 */
-.export-dialog.exporting .export-progress-container {
-  display: block;
+/* 文件列表显示控制 */
+.export-dialog.state-processing .export-file-list,
+.export-dialog.state-result .export-file-list {
+  display: none;
 }
 
 /* 进度条容器 */
 .export-progress-container {
   margin-top: 20px;
   padding: 10px 0;
-  display: none;  /* 默认隐藏 */
+  display: none;
+}
+
+/* 设置状态 */
+.export-dialog.state-setup .export-progress-container {
+  display: none;
+}
+
+/* 处理状态 */
+.export-dialog.state-processing .export-progress-container,
+.export-dialog.state-result .export-progress-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  margin: 0;
+  padding: 40px 0;
 }
 
 /* 进度条背景 */
@@ -134,6 +163,12 @@
     transparent
   );
   background-size: 1rem 1rem;
+  width: 100%;
+  max-width: 300px;
+}
+
+/* 处理状态时显示进度条动画 */
+.export-dialog.state-processing .export-progress {
   animation: progress-bar-stripes 1s linear infinite;
 }
 
@@ -145,7 +180,7 @@
 
 /* 进度文本 */
 .export-progress-text {
-  margin-top: 8px;
+  margin-top: 16px;
   font-size: 14px;
   color: #666;
   text-align: center;
@@ -157,14 +192,13 @@
   cursor: not-allowed;
 }
 
-/* 错误状态 */
-.export-dialog.error .export-progress-text {
-  color: #dc3545;
+/* 结果状态样式 */
+.export-dialog.state-result.success .export-progress-text {
+  color: #28a745;
 }
 
-/* 成功状态 */
-.export-dialog.success .export-progress-text {
-  color: #28a745;
+.export-dialog.state-result.error .export-progress-text {
+  color: #dc3545;
 }
 
 /* 进度条容器在列表之后 */

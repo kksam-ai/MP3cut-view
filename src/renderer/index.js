@@ -824,10 +824,11 @@ document.getElementById('exportBtn').addEventListener('click', () => {
     stringified: JSON.stringify(currentAudioMetadata, null, 2)
   });
 
-  // 获取有效片段，使用正确的duration路径
+  // 获取有效片段，使用正确的duration路径和采样率
   const validSegments = getValidSegments(
     markManager.getAllMarks(),
-    currentAudioMetadata.audioParams.duration
+    currentAudioMetadata.audioParams.duration,
+    currentAudioMetadata.audioParams.sampleRate
   );
 
   if (validSegments.length === 0) {

@@ -73,6 +73,21 @@ ipcMain.handle('split-audio', async (event, { filePath, segments }) => {
   }
 });
 
+// 处理取消导出请求
+ipcMain.handle('cancel-split-audio', async (event) => {
+  try {
+    console.log('收到取消导出请求');
+    audioProcessor.cancelExport();
+    return { success: true };
+  } catch (error) {
+    console.error('取消导出失败:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
 app.whenReady().then(() => {
   // 监听渲染进程发来的处理文件请求
   ipcMain.handle('process-audio-file', async (event, filePath) => {
