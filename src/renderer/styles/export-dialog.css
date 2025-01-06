@@ -103,16 +103,16 @@
   transform: translateY(-20px);
 }
 
+/* 导出状态 */
+.export-dialog.exporting .export-progress-container {
+  display: block;
+}
+
 /* 进度条容器 */
 .export-progress-container {
   margin-top: 20px;
   padding: 10px 0;
   display: none;  /* 默认隐藏 */
-}
-
-/* 当开始导出时显示进度条容器 */
-.exporting .export-progress-container {
-  display: block;
 }
 
 /* 进度条背景 */

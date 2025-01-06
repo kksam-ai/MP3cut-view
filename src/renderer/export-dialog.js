@@ -135,7 +135,9 @@ class ExportDialog {
    * @param {number} percent - 进度百分比
    */
   updateProgress(percent) {
-    this.progressBar.style.width = `${percent}%`;
+    // 确保百分比在有效范围内
+    const validPercent = Math.max(0, Math.min(100, percent));
+    this.progressBar.style.width = `${validPercent}%`;
   }
 
   /**
@@ -154,14 +156,21 @@ class ExportDialog {
 
     try {
       console.log('准备调用主进程...');
-      // 禁用导出按钮
+      // 添加导出状态类
+      this.dialog.classList.add('exporting');
       this.exportBtn.disabled = true;
 
       // 监听进度更新
       const progressHandler = (event, progress) => {
+        // 更新进度条
         this.updateProgress(progress.overallProgress);
+
+        // 更新进度文本，添加百分比显示
         this.progressText.textContent =
-          `正在导出 ${progress.currentSegment}/${progress.totalSegments}`;
+          `正在导出 ${progress.currentSegment}/${progress.totalSegments} (${Math.round(progress.overallProgress)}%)`;
+
+        // 添加调试日志
+        console.log('进度更新:', progress);
       };
 
       // 添加进度监听
@@ -178,13 +187,16 @@ class ExportDialog {
       ipcRenderer.removeListener('split-progress', progressHandler);
 
       if (result.success) {
-        // 显示成功信息
-        this.progressText.textContent = '导出完成';
-        setTimeout(() => this.hide(), 1500);
+        this.progressText.textContent = `导出完成 - 已生成 ${result.files.length} 个文件`;
+        setTimeout(() => {
+          this.dialog.classList.remove('exporting');
+          this.hide();
+        }, 1500);
       } else {
         throw new Error(result.error);
       }
     } catch (error) {
+      this.dialog.classList.remove('exporting');
       console.error('导出过程出错:', error);
       // 显示错误信息
       this.progressText.textContent = `导出失败: ${error.message}`;
