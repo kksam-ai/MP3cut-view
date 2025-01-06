@@ -72,42 +72,53 @@ class AudioProcessor {
         throw new Error('输入文件不存在');
       }
 
+      const totalSegments = segments.length;
+      let completedSegments = 0;
       const outputFiles = [];
-      let totalProgress = 0;
-      const segmentCount = segments.length;
 
-      // 处理每个片段
-      for (let i = 0; i < segments.length; i++) {
-        const segment = segments[i];
-        const duration = segment.endTime - segment.startTime;
-        const outputPath = this.generateOutputFileName(inputPath, i + 1);
+      for (const segment of segments) {
+        // 计算输出文件名
+        const outputFileName = this.generateOutputFileName(inputPath, segment.index);
+        outputFiles.push(outputFileName);
 
-        await new Promise((resolve, reject) => {
-          ffmpeg(inputPath)
-            .setStartTime(segment.startTime)
-            .setDuration(duration)
-            .output(outputPath)
-            .outputOptions(['-c copy']) // 使用复制模式，保持原始质量
-            .on('progress', (progress) => {
-              // 计算总体进度
-              const segmentProgress = progress.percent / 100;
-              const overallProgress = (i + segmentProgress) / segmentCount * 100;
-              progressCallback && progressCallback({
-                currentSegment: i + 1,
-                totalSegments: segmentCount,
-                currentProgress: progress.percent,
-                overallProgress: Math.min(overallProgress, 100)
-              });
-            })
-            .on('error', (err) => {
-              reject(new Error(`切割音频失败: ${err.message}`));
-            })
-            .on('end', () => {
-              outputFiles.push(outputPath);
-              resolve();
-            })
-            .run();
-        });
+        try {
+          // 使用ffmpeg处理单个片段
+          await new Promise((resolve, reject) => {
+            ffmpeg(inputPath)
+              .setStartTime(segment.startTime)
+              .setDuration(segment.duration)
+              .outputOptions(['-c copy']) // 恢复复制模式
+              .on('progress', (progress) => {
+                // 确保progress.percent有效，默认为0
+                const percent = typeof progress.percent === 'number' ? progress.percent : 0;
+
+                // 规范化片段进度 (0-100)
+                const currentProgress = Math.min(100, Math.max(0, percent));
+
+                // 计算总体进度
+                const segmentProgress = currentProgress / 100;
+                const overallProgress = Math.min(100, Math.round((completedSegments + segmentProgress) / totalSegments * 100));
+
+                progressCallback && progressCallback({
+                  currentSegment: completedSegments + 1,
+                  totalSegments,
+                  currentProgress: currentProgress,
+                  overallProgress: overallProgress
+                });
+              })
+              .on('error', (err) => {
+                reject(new Error(`切割音频失败: ${err.message}`));
+              })
+              .on('end', resolve)
+              .save(outputFileName);
+          });
+
+          completedSegments++;
+
+        } catch (error) {
+          console.error('处理片段出错:', error);
+          throw error;
+        }
       }
 
       return outputFiles;
