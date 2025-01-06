@@ -86,6 +86,49 @@ app.whenReady().then(() => {
       createWindow()
     }
   })
+
+  // 开发环境下的热重载配置
+  if (process.env.NODE_ENV === 'development') {
+    try {
+      const electronReloader = require('electron-reloader');
+      const path = require('path');
+
+      // 获取主进程文件的目录
+      const mainProcessDir = path.join(__dirname);
+
+      electronReloader(module, {
+        debug: true,
+        // 只监听主进程相关文件
+        watchDir: mainProcessDir,
+        // 忽略规则
+        ignore: [
+          'node_modules/**/*',
+          '.git/**/*',
+          '**/*.md',
+          '**/renderer/**'  // 忽略渲染进程文件
+        ],
+        // 重启前回调
+        beforeReload: () => {
+          // 关闭所有窗口,避免残留
+          BrowserWindow.getAllWindows().forEach(w => w.close());
+        }
+      });
+
+      // 监听渲染进程文件变化
+      const rendererDir = path.join(__dirname, '../renderer');
+      require('fs').watch(rendererDir, { recursive: true }, (eventType, filename) => {
+        // 忽略 md 文件
+        if (filename && !filename.endsWith('.md')) {
+          BrowserWindow.getAllWindows().forEach(win => {
+            win.webContents.reloadIgnoringCache();
+          });
+        }
+      });
+
+    } catch (err) {
+      console.log('Error setting up hot reload:', err);
+    }
+  }
 })
 
 app.on('window-all-closed', () => {
@@ -93,19 +136,3 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
-
-try {
-  if (process.env.NODE_ENV === 'development') {
-    require('electron-reloader')(module, {
-      debug: true,
-      watchRenderer: true,
-      ignore: [
-        'node_modules/**/*',
-        '.git/**/*',
-        '**/*.md'  // 忽略所有 .md 文件
-      ]
-    });
-  }
-} catch (_) {
-  console.log('Error loading electron-reloader');
-}
