@@ -76,7 +76,8 @@ try {
       watchRenderer: true,
       ignore: [
         'node_modules/**/*',
-        '.git/**/*'
+        '.git/**/*',
+        '**/*.md'  // 忽略所有 .md 文件
       ]
     });
   }
