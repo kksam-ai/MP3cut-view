@@ -3,6 +3,19 @@
  * 用于验证和提取有效的音频片段
  */
 
+// 时间调整的最小单位（一个百分秒），与MarkManager保持一致
+const TIME_STEP = 0.01;
+
+/**
+ * 将时间规范化到最小精度单位
+ * @private
+ * @param {number} time - 输入时间
+ * @returns {number} 规范化后的时间
+ */
+function normalizeTime(time) {
+  return Math.round(time / TIME_STEP) * TIME_STEP;
+}
+
 /**
  * 表示一个有效的音频片段
  * @typedef {Object} ValidSegment
@@ -32,8 +45,11 @@ function getValidSegments(marks, audioDuration) {
     return [];
   }
 
+  // 规范化音频总时长
+  const normalizedDuration = normalizeTime(audioDuration);
+
   // 按时间排序
-  const sortedMarks = marks.sort((a, b) => a.time - b.time);
+  const sortedMarks = marks.sort((a, b) => normalizeTime(a.time) - normalizeTime(b.time));
   console.log('排序后的标记:', sortedMarks);
 
   // 查找有效片段
@@ -44,22 +60,34 @@ function getValidSegments(marks, audioDuration) {
     const current = sortedMarks[i];
     const next = sortedMarks[i + 1];
 
+    // 规范化当前标记和下一个标记的时间
+    const currentTime = normalizeTime(current.time);
+    const nextTime = normalizeTime(next.time);
+
     // 验证时间范围
-    if (current.time < 0 || next.time > audioDuration) {
-      console.log('标记超出范围:', { current, next, audioDuration });
+    if (currentTime < 0 || nextTime > normalizedDuration) {
+      console.log('标记超出范围:', {
+        current: { ...current, normalizedTime: currentTime },
+        next: { ...next, normalizedTime: nextTime },
+        audioDuration: normalizedDuration
+      });
       continue;
     }
 
     // 检查是否为有效的开始-结束标记对
     if (current.type === 'start' && next.type === 'end') {
-      const duration = next.time - current.time;
+      const duration = normalizeTime(nextTime - currentTime);
 
       // 验证时间间隔
       if (duration >= 1) {
-        console.log('找到有效片段:', { start: current, end: next, duration });
+        console.log('找到有效片段:', {
+          start: { ...current, normalizedTime: currentTime },
+          end: { ...next, normalizedTime: nextTime },
+          duration
+        });
         segments.push({
-          startTime: current.time,
-          endTime: next.time,
+          startTime: currentTime,
+          endTime: nextTime,
           duration: duration,
           index: index++
         });
@@ -84,6 +112,9 @@ function getValidSegments(marks, audioDuration) {
  * @returns {string} 格式化的时间字符串 (HH:MM:SS:CC)
  */
 function formatTime(seconds) {
+  // 规范化输入时间
+  seconds = normalizeTime(seconds);
+
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
