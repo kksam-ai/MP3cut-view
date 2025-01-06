@@ -1,4 +1,5 @@
 const { formatTime } = require('./mark-validator');
+const { ipcRenderer } = require('electron');
 
 /**
  * 导出对话框组件
@@ -7,6 +8,10 @@ class ExportDialog {
   constructor() {
     this.init();
     this.bindEvents();
+
+    // 存储当前任务信息
+    this.metadata = null;
+    this.segments = null;
   }
 
   /**
@@ -22,6 +27,10 @@ class ExportDialog {
           </div>
           <div class="export-dialog-content">
             <ul class="export-file-list"></ul>
+            <div class="export-progress-container">
+              <div class="export-progress"></div>
+              <div class="export-progress-text"></div>
+            </div>
           </div>
           <div class="export-dialog-footer">
             <button class="secondary" data-action="cancel">取消</button>
@@ -38,6 +47,9 @@ class ExportDialog {
     this.overlay = document.querySelector('.export-dialog-overlay');
     this.dialog = document.querySelector('.export-dialog');
     this.fileList = document.querySelector('.export-file-list');
+    this.progressBar = document.querySelector('.export-progress');
+    this.progressText = document.querySelector('.export-progress-text');
+    this.exportBtn = this.dialog.querySelector('[data-action="export"]');
   }
 
   /**
@@ -72,8 +84,13 @@ class ExportDialog {
   /**
    * 显示对话框
    * @param {ValidSegment[]} segments - 有效的音频片段列表
+   * @param {Object} metadata - 音频元数据
    */
-  show(segments) {
+  show(segments, metadata) {
+    // 保存数据
+    this.segments = segments;
+    this.metadata = metadata;
+
     // 清空列表
     this.fileList.innerHTML = '';
 
@@ -88,6 +105,11 @@ class ExportDialog {
       this.fileList.appendChild(li);
     });
 
+    // 重置进度
+    this.updateProgress(0);
+    this.progressText.textContent = '';
+    this.exportBtn.disabled = false;
+
     // 显示对话框
     this.overlay.classList.add('show');
   }
@@ -97,6 +119,8 @@ class ExportDialog {
    */
   hide() {
     this.overlay.classList.remove('show');
+    this.metadata = null;
+    this.segments = null;
   }
 
   /**
@@ -107,14 +131,57 @@ class ExportDialog {
   }
 
   /**
-   * 开始导出
-   * 这里先预留，后续实现具体的导出逻辑
+   * 更新进度显示
+   * @param {number} percent - 进度百分比
    */
-  startExport() {
-    console.log('开始导出...');
-    // TODO: 实现导出逻辑
+  updateProgress(percent) {
+    this.progressBar.style.width = `${percent}%`;
+  }
+
+  /**
+   * 开始导出
+   */
+  async startExport() {
+    if (!this.metadata || !this.segments) {
+      return;
+    }
+
+    try {
+      // 禁用导出按钮
+      this.exportBtn.disabled = true;
+
+      // 监听进度更新
+      const progressHandler = (event, progress) => {
+        this.updateProgress(progress.overallProgress);
+        this.progressText.textContent =
+          `正在导出 ${progress.currentSegment}/${progress.totalSegments}`;
+      };
+
+      // 添加进度监听
+      ipcRenderer.on('split-progress', progressHandler);
+
+      // 调用主进程进行导出
+      const result = await ipcRenderer.invoke('split-audio', {
+        filePath: this.metadata.path,
+        segments: this.segments
+      });
+
+      // 移除进度监听
+      ipcRenderer.removeListener('split-progress', progressHandler);
+
+      if (result.success) {
+        // 显示成功信息
+        this.progressText.textContent = '导出完成';
+        setTimeout(() => this.hide(), 1500);
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      // 显示错误信息
+      this.progressText.textContent = `导出失败: ${error.message}`;
+      this.exportBtn.disabled = false;
+    }
   }
 }
 
-// 导出模块
 module.exports = ExportDialog;

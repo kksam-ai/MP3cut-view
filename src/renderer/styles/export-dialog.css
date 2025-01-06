@@ -102,3 +102,74 @@
 .export-dialog-overlay:not(.show) .export-dialog {
   transform: translateY(-20px);
 }
+
+/* 进度条容器 */
+.export-progress-container {
+  margin-top: 20px;
+  padding: 10px 0;
+  display: none;  /* 默认隐藏 */
+}
+
+/* 当开始导出时显示进度条容器 */
+.exporting .export-progress-container {
+  display: block;
+}
+
+/* 进度条背景 */
+.export-progress {
+  width: 0%;
+  height: 4px;
+  background: #007bff;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  position: relative;
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.15) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.15) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 1rem 1rem;
+  animation: progress-bar-stripes 1s linear infinite;
+}
+
+/* 进度条动画 */
+@keyframes progress-bar-stripes {
+  from { background-position: 1rem 0; }
+  to { background-position: 0 0; }
+}
+
+/* 进度文本 */
+.export-progress-text {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #666;
+  text-align: center;
+}
+
+/* 禁用按钮样式 */
+.export-dialog button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 错误状态 */
+.export-dialog.error .export-progress-text {
+  color: #dc3545;
+}
+
+/* 成功状态 */
+.export-dialog.success .export-progress-text {
+  color: #28a745;
+}
+
+/* 进度条容器在列表之后 */
+.export-file-list + .export-progress-container {
+  border-top: 1px solid #eee;
+  margin-top: 15px;
+  padding-top: 15px;
+}
