@@ -48,6 +48,30 @@ async function handleAudioFile(filePath) {
   }
 }
 
+// 处理音频切片请求
+ipcMain.handle('split-audio', async (event, { filePath, segments }) => {
+  try {
+    const outputFiles = await audioProcessor.splitAudio(
+      filePath,
+      segments,
+      (progress) => {
+        // 发送进度更新到渲染进程
+        event.sender.send('split-progress', progress);
+      }
+    );
+
+    return {
+      success: true,
+      files: outputFiles
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
 app.whenReady().then(() => {
   // 监听渲染进程发来的处理文件请求
   ipcMain.handle('process-audio-file', async (event, filePath) => {
