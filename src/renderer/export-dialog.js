@@ -142,11 +142,18 @@ class ExportDialog {
    * 开始导出
    */
   async startExport() {
+    console.log('开始导出...', {
+      metadata: this.metadata,
+      segments: this.segments
+    });
+
     if (!this.metadata || !this.segments) {
+      console.warn('缺少必要的导出数据');
       return;
     }
 
     try {
+      console.log('准备调用主进程...');
       // 禁用导出按钮
       this.exportBtn.disabled = true;
 
@@ -160,11 +167,12 @@ class ExportDialog {
       // 添加进度监听
       ipcRenderer.on('split-progress', progressHandler);
 
-      // 调用主进程进行导出
+      // 调用主进程进行导出，使用正确的文件路径
       const result = await ipcRenderer.invoke('split-audio', {
-        filePath: this.metadata.path,
+        filePath: this.metadata.fileMetadata.path,
         segments: this.segments
       });
+      console.log('主进程返回结果:', result);
 
       // 移除进度监听
       ipcRenderer.removeListener('split-progress', progressHandler);
@@ -177,6 +185,7 @@ class ExportDialog {
         throw new Error(result.error);
       }
     } catch (error) {
+      console.error('导出过程出错:', error);
       // 显示错误信息
       this.progressText.textContent = `导出失败: ${error.message}`;
       this.exportBtn.disabled = false;

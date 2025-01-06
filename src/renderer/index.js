@@ -818,6 +818,12 @@ document.getElementById('exportBtn').addEventListener('click', () => {
     return;
   }
 
+  // 打印完整的metadata结构
+  console.log('完整的currentAudioMetadata结构:', {
+    raw: currentAudioMetadata,
+    stringified: JSON.stringify(currentAudioMetadata, null, 2)
+  });
+
   // 获取有效片段，使用正确的duration路径
   const validSegments = getValidSegments(
     markManager.getAllMarks(),

@@ -50,21 +50,22 @@ async function handleAudioFile(filePath) {
 
 // 处理音频切片请求
 ipcMain.handle('split-audio', async (event, { filePath, segments }) => {
+  console.log('收到导出请求:', { filePath, segments });
   try {
     const outputFiles = await audioProcessor.splitAudio(
       filePath,
       segments,
       (progress) => {
-        // 发送进度更新到渲染进程
         event.sender.send('split-progress', progress);
       }
     );
-
+    console.log('导出完成:', outputFiles);
     return {
       success: true,
       files: outputFiles
     };
   } catch (error) {
+    console.error('导出失败:', error);
     return {
       success: false,
       error: error.message
