@@ -1,8 +1,16 @@
 {
-  "name": "audio-cutter",
+  "name": "mp3cut",
+  "productName": "MP3cut",
   "version": "1.0.0",
   "description": "Audio cutting tool with waveform visualization",
   "main": "src/main/index.js",
+  "build": {
+    "appId": "com.mp3cut.app",
+    "productName": "MP3cut",
+    "mac": {
+      "category": "public.app-category.music"
+    }
+  },
   "scripts": {
     "start": "electron .",
     "dev": "nodemon --watch src/main --exec electron . --dev",

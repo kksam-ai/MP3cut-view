@@ -1,13 +1,17 @@
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, ipcMain, Menu } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const audioProcessor = require('./audio-processor')
+
+// 设置应用名称
+const APP_NAME = 'MP3cut'
 
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
     frame: false,
+    title: APP_NAME,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     titleBarOverlay: process.platform === 'win32' ? {
       color: '#00000000',
@@ -22,6 +26,9 @@ function createWindow() {
 
   win.loadFile(path.join(__dirname, '../renderer/index.html'))
 
+  // 设置窗口标题
+  win.setTitle(APP_NAME)
+
   // 添加平台类名到 body
   win.webContents.on('dom-ready', () => {
     win.webContents.executeJavaScript(`
@@ -32,6 +39,29 @@ function createWindow() {
   // 获取渲染进程文件的绝对路径
   const rendererPath = path.join(__dirname, '../renderer')
   console.log('Watching directory:', rendererPath)
+}
+
+// 创建自定义菜单
+function createCustomMenu() {
+  const isMac = process.platform === 'darwin'
+  const template = [
+    // 仅在 Mac 上显示应用菜单
+    ...(isMac ? [{
+      label: APP_NAME,
+      submenu: [
+        { role: 'about', label: `关于 ${APP_NAME}` },
+        { type: 'separator' },
+        { role: 'hide', label: `隐藏 ${APP_NAME}` },
+        { role: 'hideOthers', label: '隐藏其他' },
+        { role: 'unhide', label: '显示全部' },
+        { type: 'separator' },
+        { role: 'quit', label: `退出 ${APP_NAME}` }
+      ]
+    }] : [])
+  ]
+
+  const menu = Menu.buildFromTemplate(template)
+  Menu.setApplicationMenu(menu)
 }
 
 // 处理音频文件
@@ -102,6 +132,15 @@ ipcMain.handle('cancel-split-audio', async (event) => {
 });
 
 app.whenReady().then(() => {
+  // 设置应用名称
+  if (process.platform === 'darwin') {
+    app.name = APP_NAME
+    app.setName(APP_NAME)
+  }
+
+  // 创建自定义菜单
+  createCustomMenu()
+
   // 监听渲染进程发来的处理文件请求
   ipcMain.handle('process-audio-file', async (event, filePath) => {
     return await handleAudioFile(filePath)
