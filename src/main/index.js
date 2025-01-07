@@ -6,6 +6,36 @@ const audioProcessor = require('./audio-processor')
 // 设置应用名称
 const APP_NAME = 'MP3cut'
 
+// 尽早设置应用名称
+if (process.platform === 'darwin') {
+  app.name = APP_NAME
+
+  // 在开发环境下修改 Electron.app 的 Info.plist
+  if (process.env.NODE_ENV === 'development') {
+    try {
+      const plistPath = path.join(__dirname, '../../node_modules/electron/dist/Electron.app/Contents/Info.plist')
+      console.log('Attempting to modify Info.plist at:', plistPath)
+
+      if (fs.existsSync(plistPath)) {
+        let plistContent = fs.readFileSync(plistPath, 'utf8')
+
+        // 替换 CFBundleName
+        plistContent = plistContent.replace(
+          /<key>CFBundleName<\/key>[\s\S]*?<string>.*?<\/string>/,
+          `<key>CFBundleName</key>\n\t<string>${APP_NAME}</string>`
+        )
+
+        fs.writeFileSync(plistPath, plistContent)
+        console.log('Successfully modified Info.plist')
+      } else {
+        console.log('Info.plist not found at expected path')
+      }
+    } catch (err) {
+      console.log('Error modifying Info.plist:', err)
+    }
+  }
+}
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
@@ -47,15 +77,15 @@ function createCustomMenu() {
   const template = [
     // 仅在 Mac 上显示应用菜单
     ...(isMac ? [{
-      label: APP_NAME,
+      label: app.name,
       submenu: [
-        { role: 'about', label: `关于 ${APP_NAME}` },
+        { role: 'about', label: `关于 ${app.name}` },
         { type: 'separator' },
-        { role: 'hide', label: `隐藏 ${APP_NAME}` },
+        { role: 'hide', label: `隐藏 ${app.name}` },
         { role: 'hideOthers', label: '隐藏其他' },
         { role: 'unhide', label: '显示全部' },
         { type: 'separator' },
-        { role: 'quit', label: `退出 ${APP_NAME}` }
+        { role: 'quit', label: `退出 ${app.name}` }
       ]
     }] : [])
   ]
@@ -132,12 +162,6 @@ ipcMain.handle('cancel-split-audio', async (event) => {
 });
 
 app.whenReady().then(() => {
-  // 设置应用名称
-  if (process.platform === 'darwin') {
-    app.name = APP_NAME
-    app.setName(APP_NAME)
-  }
-
   // 创建自定义菜单
   createCustomMenu()
 
