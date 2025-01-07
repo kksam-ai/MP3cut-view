@@ -7,6 +7,13 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
+    frame: false,
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    titleBarOverlay: process.platform === 'win32' ? {
+      color: '#00000000',
+      symbolColor: '#FFFFFF',
+      height: 32
+    } : false,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
@@ -14,7 +21,13 @@ function createWindow() {
   })
 
   win.loadFile(path.join(__dirname, '../renderer/index.html'))
-  win.webContents.openDevTools()
+
+  // 添加平台类名到 body
+  win.webContents.on('dom-ready', () => {
+    win.webContents.executeJavaScript(`
+      document.body.classList.add('platform-${process.platform}');
+    `);
+  });
 
   // 获取渲染进程文件的绝对路径
   const rendererPath = path.join(__dirname, '../renderer')

@@ -11,7 +11,6 @@ const emptyState = document.getElementById('emptyState');
 const loadedState = document.getElementById('loadedState');
 const playBtn = document.getElementById('playBtn');
 const exportBtn = document.getElementById('exportBtn');
-const openFileBtn = document.getElementById('openFileBtn');
 const mainContent = document.querySelector('.main-content');
 const loadingMask = document.getElementById('loadingMask');
 const MarkManager = require('./mark-manager');
@@ -391,36 +390,39 @@ function updateAudioInfo(metadata) {
   `;
 }
 
-// 绑定打开文件按钮事件
-openFileBtn.addEventListener('click', () => {
-  fileInput.click();
-});
-
 // 点击上传
 dropZone.addEventListener('click', () => {
   fileInput.click();
 });
 
+// 文件选择处理
 fileInput.addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (file) {
     handleFile(file);
+    // 重置 input 的值，这样同一个文件可以重复选择
+    fileInput.value = '';
   }
 });
 
 // 拖拽上传
 dropZone.addEventListener('dragover', (e) => {
   e.preventDefault();
+  e.stopPropagation();
   dropZone.classList.add('dragover');
 });
 
-dropZone.addEventListener('dragleave', () => {
+dropZone.addEventListener('dragleave', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
   dropZone.classList.remove('dragover');
 });
 
 dropZone.addEventListener('drop', (e) => {
   e.preventDefault();
+  e.stopPropagation();
   dropZone.classList.remove('dragover');
+  mainContent.classList.remove('dragover');
 
   const file = e.dataTransfer.files[0];
   if (file) {

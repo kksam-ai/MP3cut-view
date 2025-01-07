@@ -15,6 +15,11 @@ class AudioPlayer {
   }
 
   _initAudioContext() {
+    // 如果已存在音频上下文，先关闭它
+    if (this.audioContext) {
+      this.audioContext.close();
+    }
+
     // 创建新的音频上下文
     this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -42,12 +47,10 @@ class AudioPlayer {
   async loadAudio(arrayBuffer) {
     try {
       // 完全清理旧的资源
-      this._cleanup();
+      await this._cleanup();
 
-      // 如果音频上下文被挂起，重新初始化
-      if (this.audioContext.state === 'closed') {
-        this._initAudioContext();
-      }
+      // 重新初始化音频上下文
+      this._initAudioContext();
 
       // 创建新的音频元素
       this._initAudio();
@@ -103,14 +106,14 @@ class AudioPlayer {
         audioBuffer: this.audioBuffer
       };
     } catch (error) {
-      this._cleanup();
+      await this._cleanup();
       const errorMessage = error.message || '音频处理失败';
       console.error('Audio loading error:', error);
       throw new Error(errorMessage);
     }
   }
 
-  _cleanup() {
+  async _cleanup() {
     // 停止播放
     if (this.isPlaying) {
       this.pause();
@@ -118,7 +121,11 @@ class AudioPlayer {
 
     // 断开并清理媒体源节点
     if (this.source) {
-      this.source.disconnect();
+      try {
+        this.source.disconnect();
+      } catch (e) {
+        console.warn('Error disconnecting source:', e);
+      }
       this.source = null;
     }
 
@@ -134,6 +141,16 @@ class AudioPlayer {
     if (this.currentBlobUrl) {
       URL.revokeObjectURL(this.currentBlobUrl);
       this.currentBlobUrl = null;
+    }
+
+    // 关闭并清理音频上下文
+    if (this.audioContext) {
+      try {
+        await this.audioContext.close();
+      } catch (e) {
+        console.warn('Error closing audio context:', e);
+      }
+      this.audioContext = null;
     }
 
     // 重置状态
