@@ -1,368 +1,470 @@
-# 音频切割软件开发记录
+# 音频切割软件技术文档
 
-## 第一阶段进度
+## 技术架构
 
-### 1. 基础框架搭建
-- [x] 创建 Electron 项目结构
-- [x] 配置主进程和渲染进程
-- [x] 实现基础界面
-- [x] 配置 Mac 应用名称显示
-  * package.json 配置 productName
-  * Info.plist 动态修改
-  * 应用菜单本地化
-  * 窗口标题设置
+### 1. 核心技术栈
+- Electron ^25.0.0 (应用框架)
+- Web Audio API (音频处理)
+- Canvas API (波形渲染)
+- FFmpeg (音频转换)
+- Node.js (系统功能)
 
-### 2. 开发环境配置
-- [x] 环境变量管理
-  * 使用 cross-env 设置 NODE_ENV
-  * 开发环境配置
-  * 生产环境配置
-- [x] 热重载配置
-  * 主进程热重载 (electron-reloader)
-  * 渲染进程热重载
-  * 文件监视配置 (nodemon)
-- [x] 错误处理和日志
+### 2. 进程分工
+1. 主进程 (Main Process)
+- 文件系统操作
+- 音频格式转换
+- 应用生命周期
+- 窗口管理
 
-### 3. 文件操作功能
-- [x] 支持点击上传
-- [x] 支持拖拽上传
-- [x] 文件格式验证
-- [x] 显示基本文件信息
+2. 渲染进程 (Renderer Process)
+- 界面渲染
+- 音频解析
+- 波形计算
+- 用户交互
 
-### 4. 音频解析和波形显示
-- [x] 音频文件转换
-- [x] 波形数据计算
-- [x] Canvas 波形绘制
-- [x] 多行波形布局
-- [x] 播放进度指示
-- [x] 点击定位功能
+### 3. 数据流转
+1. 音频处理流程
+- 主进程: 文件读取 -> 格式转换 -> 临时文件
+- 渲染进程: 解码 -> 波形计算 -> 显示
 
-### 5. 音频播放控制
-- [x] 基础播放/暂停功能
-- [x] 播放进度同步显示
-- [x] 空格键播放控制
-- [x] 播放结束处理
-- [x] 播放位置记忆
+2. 导出流程
+- 标记验证
+- 分段处理
+- 进度通知
+- 错误恢复
 
-### 4. 音频处理功能
-- [x] 音频剪切
-  * 智能格式检测
-  * 自动帧对齐
-  * 保留原始比特率
-  * 多格式支持
-- [x] 音频导出
-  * 进度显示
-  * 错误处理
-  * 取消功能
-- [x] 批量处理
+## 开发进度
 
-## 遇到的问题和解决方案
+### 1. 已完成功能
+- [x] 基础框架搭建
+- [x] 文件上传功能
+- [x] 波形显示功能
+- [x] 播放控制功能
+- [x] 标记系统
+- [x] 自动检测
+- [x] 基础导出功能
 
-### 1. FFmpeg 相关问题
-**问题**: 上传文件后提示 "Cannot find ffmpeg"
-**解决方案**:
-- 添加 ffmpeg-static 依赖
-- 设置 ffmpeg 路径
+### 2. 开发中功能
+- [ ] 导出性能优化
+  * 并行处理
+  * 内存优化
+  * 进度计算优化
+
+### 3. 待开发功能
+- [ ] 试听功能
+  * 选段播放
+  * 标记区间播放
+  * 波形同步
+- [ ] 波形导航
+  * 缩放控制
+  * 快速定位
+- [ ] 高级播放
+  * 循环播放
+  * 速度控制
+
+## 实现细节
+
+### 1. 波形渲染
+1. 设备像素比适配
+```javascript
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+
+  // 设置Canvas的物理像素大小
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+
+  // 设置Canvas的CSS像素大小
+  canvas.style.width = `${rect.width}px`;
+  canvas.style.height = `${rect.height}px`;
+
+  // 缩放绘图上下文以适配设备像素比
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  return ctx;
+}
+```
+
+2. 波形数据归一化
+```javascript
+function normalizeWaveform(waveform) {
+  const maxAmp = Math.max(...waveform);
+  return waveform.map(amp => amp / maxAmp);
+}
+```
+
+3. 渲染优化
+```javascript
+class WaveformRenderer {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = setupCanvas(canvas);
+    this.cache = new Map(); // 波形缓存
+    this.lastDrawnFrame = null; // 上一帧缓存
+    this.renderQueued = false; // 渲染队列标记
+  }
+
+  // 智能重绘策略
+  queueRender() {
+    if (this.renderQueued) return;
+    this.renderQueued = true;
+    requestAnimationFrame(() => {
+      this.render();
+      this.renderQueued = false;
+    });
+  }
+
+  // 波形渲染实现
+  render() {
+    // 检查是否需要重绘
+    const currentFrame = this.getFrameData();
+    if (this.shouldSkipRender(currentFrame)) return;
+
+    // 清除画布
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // 绘制波形
+    this.ctx.save();
+    this.drawWaveform();
+    this.drawPlayhead();
+    this.drawMarkers();
+    this.ctx.restore();
+
+    // 更新缓存
+    this.lastDrawnFrame = currentFrame;
+  }
+
+  // 波形绘制优化
+  drawWaveform() {
+    // 使用路径批量绘制
+    this.ctx.beginPath();
+    for (let i = 0; i < this.waveform.length; i++) {
+      // 计算位置
+      const x = i * (BAR_WIDTH + BAR_GAP);
+      const height = this.waveform[i] * this.canvas.height;
+
+      // 绘制波形条
+      this.ctx.moveTo(x, (this.canvas.height - height) / 2);
+      this.ctx.lineTo(x, (this.canvas.height + height) / 2);
+    }
+    this.ctx.stroke();
+  }
+}
+```
+
+### 2. 元数据管理
+1. 时间格式化
+```javascript
+class TimeFormatter {
+  static readonly PRECISION = 0.01; // 时间精度(秒)
+
+  // 标准化时间值
+  static normalize(time) {
+    return Math.round(time / this.PRECISION) * this.PRECISION;
+  }
+
+  // 格式化显示
+  static format(time, showMs = false) {
+    const hours = Math.floor(time / 3600);
+    const minutes = Math.floor((time % 3600) / 60);
+    const seconds = Math.floor(time % 60);
+    const ms = Math.round((time % 1) * 100);
+
+    if (hours > 0) {
+      return showMs
+        ? `${hours}:${minutes}:${seconds}.${ms}`
+        : `${hours}:${minutes}:${seconds}`;
+    }
+
+    return showMs
+      ? `${minutes}:${seconds}.${ms}`
+      : `${minutes}:${seconds}`;
+  }
+}
+```
+
+2. 数据不可变性
+```javascript
+class MetadataManager {
+  // 深度冻结对象
+  static deepFreeze(obj) {
+    const frozen = new WeakSet();
+
+    function freeze(obj) {
+      if (frozen.has(obj)) return;
+      Object.freeze(obj);
+      frozen.add(obj);
+
+      Object.values(obj).forEach(value => {
+        if (typeof value === 'object' && value !== null) {
+          freeze(value);
+        }
+      });
+    }
+
+    freeze(obj);
+    return obj;
+  }
+
+  // 创建元数据
+  static create(data) {
+    const metadata = {
+      file: {
+        name: data.name,
+        size: data.size,
+        type: data.type,
+        lastModified: data.lastModified
+      },
+      audio: {
+        duration: data.duration,
+        sampleRate: data.sampleRate,
+        channels: data.channels
+      },
+      marks: []
+    };
+
+    return this.deepFreeze(metadata);
+  }
+}
+```
+
+### 3. 标记系统
+1. 标记验证
+```typescript
+interface MarkValidationRule {
+  validate(mark: Mark, marks: Mark[]): boolean;
+  message: string;
+}
+
+class MarkValidator {
+  private rules: MarkValidationRule[] = [
+    // 时间范围检查
+    {
+      validate: (mark, marks) => mark.time >= 0 && mark.time <= this.duration,
+      message: '标记时间超出音频范围'
+    },
+    // 配对状态检查
+    {
+      validate: (mark, marks) => {
+        if (mark.type === 'start') {
+          return !marks.some(m =>
+            m.type === 'start' &&
+            Math.abs(m.time - mark.time) < TimeFormatter.PRECISION
+          );
+        }
+        return true;
+      },
+      message: '存在重复的开始标记'
+    },
+    // 时间间隔检查
+    {
+      validate: (mark, marks) => {
+        const pair = marks.find(m => m.id === mark.pairedId);
+        if (!pair) return true;
+        return Math.abs(mark.time - pair.time) >= MIN_SEGMENT_DURATION;
+      },
+      message: '标记间隔小于最小片段时长'
+    }
+  ];
+
+  validate(mark: Mark, marks: Mark[]): ValidationResult {
+    for (const rule of this.rules) {
+      if (!rule.validate(mark, marks)) {
+        return { valid: false, message: rule.message };
+      }
+    }
+    return { valid: true };
+  }
+}
+```
+
+2. 标记冲突处理
+```javascript
+class MarkManager {
+  // 查找可用位置
+  findAvailablePosition(time, direction = 1) {
+    const step = TimeFormatter.PRECISION * direction;
+    let testTime = time;
+
+    while (testTime >= 0 && testTime <= this.duration) {
+      if (!this.hasMarkAt(testTime)) {
+        return testTime;
+      }
+      testTime += step;
+    }
+
+    return null;
+  }
+
+  // 处理标记冲突
+  handleMarkConflict(mark) {
+    const existingMark = this.findMarkAt(mark.time);
+    if (!existingMark) return mark.time;
+
+    // 尝试向后查找
+    const afterPos = this.findAvailablePosition(mark.time, 1);
+    if (afterPos !== null) return afterPos;
+
+    // 尝试向前查找
+    const beforePos = this.findAvailablePosition(mark.time, -1);
+    if (beforePos !== null) return beforePos;
+
+    throw new Error('无法找到可用的标记位置');
+  }
+}
+```
+
+### 4. 音频处理
+1. 格式检测
+```javascript
+async function detectAudioFormat(filePath) {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(filePath, (err, metadata) => {
+      if (err) return reject(err);
+
+      const stream = metadata.streams.find(s => s.codec_type === 'audio');
+      if (!stream) return reject(new Error('No audio stream found'));
+
+      resolve({
+        codec: stream.codec_name,
+        sampleRate: stream.sample_rate,
+        channels: stream.channels,
+        bitRate: stream.bit_rate,
+        duration: parseFloat(stream.duration)
+      });
+    });
+  });
+}
+```
+
+2. 帧对齐
+```javascript
+class MP3FrameAligner {
+  // MP3帧大小计算
+  static calculateFrameSize(sampleRate, bitRate, padding) {
+    const coefficient = (sampleRate < 32000) ? 72 : 144;
+    return Math.floor((coefficient * bitRate * 1000 / sampleRate) + padding);
+  }
+
+  // 查找最近的帧边界
+  static findNearestFrame(offset, frameSize) {
+    return Math.round(offset / frameSize) * frameSize;
+  }
+
+  // 调整切割点
+  static alignCutPoint(time, format) {
+    const samplesPerFrame = 1152; // MP3标准
+    const framesPerSecond = format.sampleRate / samplesPerFrame;
+    const frameSize = this.calculateFrameSize(
+      format.sampleRate,
+      format.bitRate / 1000,
+      0
+    );
+
+    const frameOffset = Math.round(time * framesPerSecond) * frameSize;
+    return this.findNearestFrame(frameOffset, frameSize) / frameSize / framesPerSecond;
+  }
+}
+```
+
+## 性能优化
+
+### 1. 波形渲染优化
+- 固定采样密度(15点/秒)
+- 使用峰值检测保留细节
+- 优化重绘策略
+- 缓存机制
+
+### 2. 内存使用优化
+- 及时清理临时文件
+- 优化对象创建
+- 避免内存泄漏
+- 大文件处理策略
+
+### 3. 导出性能优化
+- 并行处理支持
+- 内存使用优化
+- 进度计算优化
+- 取消机制优化
+
+## 问题解决方案
+
+### 1. FFmpeg相关问题
+问题: 上传文件后提示 "Cannot find ffmpeg"
+解决:
 ```javascript
 const ffmpegPath = require('ffmpeg-static');
 ffmpeg.setFfmpegPath(ffmpegPath);
 ```
 
 ### 2. 音频解码问题
-**问题**: node-web-audio-api 解码错误 "Invalid argument, please consider using the load helper"
-**解决方案**:
-1. 重构音频处理架构：
-   - 主进程只负责文件格式转换
-   - 使用浏览器原生 Web Audio API 处理音频数据
-   - 在渲染进程中计算波形
+问题: node-web-audio-api 解码错误
+解决:
+- 主进程只负责格式转换
+- 使用浏览器原生 Web Audio API
+- 优化临时文件管理
 
-2. 处理流程优化：
-   - 主进程将音频转换为 WAV 格式
-   - 渲染进程读取 WAV 文件并解码
-   - 使用 AudioContext 进行波形分析
-   - 处理完成后删除临时文件
+### 3. Mac应用名称问题
+问题: 开发环境下应用名称显示为 Electron
+解决:
+- 配置 package.json
+- 动态修改 Info.plist
+- 统一使用应用名称
 
-### 3. Mac 应用名称显示问题
-**问题**: 开发环境下应用名称显示为 Electron
-**解决方案**:
-1. package.json 配置：
-   - 设置 name 和 productName
-   - 配置 build 选项
+### 4. 波形渲染问题
+问题: 长音频波形显示不完整
+解决:
+- 移除采样点限制
+- 优化采样算法
+- 使用峰值检测
 
-2. 动态修改 Info.plist：
-   - 在开发环境下修改 Electron.app 的 Info.plist
-   - 替换 CFBundleName
-   - 添加错误处理和日志
+### 5. 播放同步问题
+问题: 播放进度不同步
+解决:
+- 统一时间基准
+- 优化位置计算
+- 添加日志跟踪
 
-3. 应用菜单配置：
-   - 使用 app.name 设置菜单项
-   - 本地化菜单文本
-   - 统一使用应用名称
+## 开发环境
 
-### 4. 开发环境配置问题
-**问题**: 环境变量设置和热重载配置
-**解决方案**:
-1. 使用 cross-env 管理环境变量：
-   - 修改 npm scripts
-   - 统一环境变量设置
+### 1. 依赖版本
+- Node.js >= 16
+- npm >= 8
+- MacOS >= 10.15
 
-2. 配置热重载：
-   - 使用 electron-reloader 监视主进程
-   - 使用 nodemon 监视文件变化
-   - 优化重载性能
+### 2. 开发工具
+- cross-env: ^7.0.3 (环境变量)
+- nodemon: ^3.0.2 (热重载)
+- electron-reloader: ^1.2.3 (热重载)
+- chokidar: ^4.0.3 (文件监视)
 
-3. 错误处理：
-   - 添加详细日志
-   - 优化重载时的窗口管理
-   - 防止资源泄露
+### 3. 构建命令
+```bash
+# 开发模式
+npm run dev
 
-### 4. 波形渲染效果问题
-**问题**: 长音频的波形显示不完整，细节丢失
-**解决方案**:
-1. 优化采样策略：
-   - 移除硬编码的1000个采样点限制
-   - 基于显示需求计算采样点数(每秒15个波形条)
-   - 确保采样点数量与音频时长成正比
+# 监视模式
+npm run watch
 
-2. 改进采样算法：
-   ```javascript
-   const samplesNeeded = Math.ceil(
-     audioBuffer.duration * (PIXELS_PER_SECOND / (BAR_WIDTH + BAR_GAP))
-   );
-   ```
+# 构建应用
+npm run build
+```
 
-3. 使用峰值检测：
-   - 替代平均值计算
-   - 保留每个时间窗口内的最大波形特征
-   - 避免过度平滑和信息丢失
-   ```javascript
-   for (let i = 0; i < samples; i++) {
-     const start = i * blockSize;
-     const end = Math.min(start + blockSize, channelData.length);
-     let maxAmp = 0;
-     for (let j = start; j < end; j++) {
-       const abs = Math.abs(channelData[j]);
-       if (abs > maxAmp) maxAmp = abs;
-     }
-     waveform[i] = maxAmp;
-   }
-   ```
+## 测试规范
 
-4. 效果验证：
-   - 12分钟音频约需要10800个采样点(720秒 * 15点/秒)
-   - 波形显示完整，细节清晰
-   - 与短音频的渲染效果保持一致
-   - 自动换行正常工作
+### 1. 单元测试
+- 核心算法测试
+- 文件操作测试
+- 数据处理测试
 
-### 5. 播放进度同步问题
-**问题**: 长音频播放时波形与播放进度不同步
-**解决方案**:
-1. 统一时间基准：
-   - 使用音频实际持续时间作为参考
-   - 基于进度比例计算位置
-   - 保持波形采样密度一致
+### 2. 功能测试
+- 界面操作测试
+- 音频处理测试
+- 导出功能测试
 
-2. 优化计算逻辑：
-   - 移除像素级计算依赖
-   - 使用波形条数索引定位
-   - 添加详细日志跟踪
-
-## 当前实现的功能
-1. 文件上传
-   - 支持 MP3/M4A/MP4 格式
-   - 支持拖拽和点击上传
-   - 文件格式验证
-   - 错误处理优化
-
-2. 音频信息显示
-   - 文件名
-   - 文件大小
-   - 音频时长
-   - 采样率
-
-3. 波形显示
-   - 实时波形计算
-   - Canvas 绘制
-   - 自适应窗口大小
-   - 多行布局
-   - 播放进度指示
-   - 点击定位
-
-4. 播放控制
-   - 播放/暂停切换
-   - 进度同步显示
-   - 键盘快捷键
-   - 播放位置记忆
-
-## 音频元数据管理
-
-### 1. 核心功能
-- 统一的元数据结构
-  * 文件基本信息管理
-  * 音频参数管理
-  * 标签信息管理
-- 数据不可变性保证
-  * 深度冻结对象
-  * 防止运行时修改
-  * 循环引用处理
-- 完整的错误处理
-  * 自定义错误类型
-  * 详细错误信息
-  * 错误恢复机制
-
-### 2. 性能优化
-- 对象冻结优化
-  * WeakMap 缓存已冻结对象
-  * 优化对象类型检查
-  * 处理循环引用
-- 验证优化
-  * WeakSet 缓存已验证对象
-  * 优化错误收集
-  * 提前返回机制
-- 对象创建优化
-  * 减少中间对象创建
-  * 优化属性访问
-  * 类型检查缓存
-
-### 3. 最佳实践
-- 统一的元数据创建
-- 规范的错误处理
-- 安全的数据访问
-- 性能优化考虑
-
-## 下一步开发计划
-
-### 1. 工具栏开发
-- [x] 标记操作按钮
-- [x] 导出功能按钮
-- [x] 按钮状态管理
-
-### 2. 波形显示优化
-- [ ] 缩放比例控制
-- [ ] 标记点显示
-- [ ] 选区功能
-
-### 3. 音频处理功能
-- [ ] 音频剪切
-- [ ] 音频导出
-- [ ] 批量处理
-
-## 技术要点总结
-
-### 1. 进程通信
-- 主进程负责文件系统操作和格式转换
-- 渲染进程负责音频解析和界面交互
-- 使用 IPC 进行进程间通信
-
-### 2. 音频处理
-- 使用 ffmpeg 进行格式转换
-- 使用 Web Audio API 进行解码和分析
-- 实现波形数据计算和归一化
-- 播放进度同步机制
-- 音频播放方案：
-  * 使用 AudioContext 创建音频上下文
-  * 通过 MediaElementSource 连接 audio 元素
-  * 利用 AudioNode 管道处理音频流
-  * 支持实时播放位置获取和控制
-
-### 3. 界面实现
-- 使用 Canvas 绘制波形
-- 响应式设计
-- 拖放操作优化
-- 播放控制交互
-- 设备像素比适配：
-  * 使用 window.devicePixelRatio 获取设备像素比
-  * Canvas 物理像素和 CSS 像素的转换
-  * 确保在高分辨率屏幕下渲染清晰
-  * 布局计算时考虑像素比影响
-- 渲染性能优化：
-  * 使用 requestAnimationFrame 进行动画
-  * 避免频繁的 Canvas 状态切换
-  * 合理使用缓存机制
-  * 优化重绘策略
-
-### 4. 错误处理
-- 文件格式验证
-- 转换过程异常处理
-- 临时文件清理机制
-- 用户友好的错误提示
-
-### 5. 元数据管理
-- 统一的时间格式化
-  * 完整格式 (hh:mm:ss:ms)
-  * 智能显示格式
-  * 时间解析功能
-- 数据职责划分
-  * AudioBuffer 负责音频数据存储
-  * 元数据模块负责信息管理
-  * 确保数据一致性
-- 数据获取流程
-  * 从 AudioBuffer 获取原始数据
-  * 通过元数据模块统一管理
-  * 其他模块从元数据获取
-
-### 6. 标记管理
-- 时间精度处理
-  * 使用 0.01 秒作为最小精度单位
-  * 自动规范化时间值
-  * 处理浮点数精度问题
-- 标记冲突处理
-  * 禁止新建重复标记
-  * 编辑时自动偏移冲突标记
-  * 支持向前向后查找可用位置
-
-### 1. 音频处理架构
-- 格式检测
-  * 使用 ffprobe 获取音频格式信息
-  * 支持 MP3/M4A/MP4 格式
-  * 自动检测编码参数
-- 帧对齐处理
-  * MP3 帧大小计算
-  * 智能边界调整
-  * 避免音频断裂
-- 转码策略
-  * 优先使用 copy 模式
-  * 必要时进行转码
-  * 保留原始参数
-
-### 2. 音频导出流程
-1. 格式检测
-   - 使用 ffprobe 获取音频信息
-   - 检测编码格式和参数
-   - 确定处理策略
-
-2. 帧对齐
-   - 计算帧时长
-   - 调整切割点
-   - 确保音频完整性
-
-3. 导出处理
-   - 选择合适的导出模式
-   - 监控导出进度
-   - 错误恢复机制
-
-4. 性能优化
-   - 并行处理支持
-   - 内存使用优化
-   - 临时文件管理
-
-### 3. 错误处理
-- 格式检测错误
-  * 不支持的格式
-  * 参数获取失败
-  * 文件损坏
-- 处理过程错误
-  * 帧对齐失败
-  * 转码错误
-  * 导出中断
-- 错误恢复
-  * 自动重试机制
-  * 降级处理方案
-  * 用户友好提示
-
-## 注意事项
-1. 文件处理时需要考虑清理临时文件
-2. 大文件处理需要考虑内存使用
-3. 需要处理各种异常情况
-4. 需要优化用户交互体验
-5. 播放控制需要考虑边界情况
+### 3. 性能测试
+- 内存占用测试
+- 大文件处理测试
+- 批量导出测试
